@@ -1,0 +1,3 @@
+# For local development only. Set the production value in Cloudflare Worker secrets.
+# This must be SHA-256 of your private random initialization code, never a password.
+ADMIN_BOOTSTRAP_TOKEN_HASH=

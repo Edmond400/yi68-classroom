@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789261951036,
+      "tag": "0000_chilly_leo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789264588267,
+      "tag": "0001_magical_tarot",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792743724778,
+      "tag": "0002_bright_inertia",
+      "breakpoints": true
+    }
+  ]
+}

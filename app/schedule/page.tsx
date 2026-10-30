@@ -1,0 +1,7 @@
+import { getPublicData } from '@/lib/data';
+import { Blank, EventRows, Unavailable } from '@/components/public-ui';
+export const dynamic = 'force-dynamic';
+export const metadata={title:'日程与 DDL'};
+export default async function Schedule(){let data;try{data=await getPublicData()}catch{return <Unavailable/>}const active=data.events.filter(e=>Date.parse(e.ends_at||e.starts_at)>=Date.now());const past=data.events.filter(e=>Date.parse(e.ends_at||e.starts_at)<Date.now()).reverse();const pending=data.items.filter(i=>!['已完成','已暂停'].includes(i.data.status)&&!data.events.some(e=>e.item_id===i.id&&e.state!=='cancelled'));
+ return <><div className="page-heading"><div><p className="eyebrow">UPCOMING & DEADLINES</p><h1>日程与 DDL</h1></div><span className="small muted">北京时间</span></div><div className="home-grid"><div className="stack"><section className="panel"><div className="panel-head"><h2>接下来的安排</h2></div>{active.length?<EventRows events={active}/>:<Blank calendar title="暂无已确认的后续日程" description="时间明确后，会在这里标明日期、对象和需要做的事。"/>}</section>{past.length>0&&<section className="panel"><div className="panel-head"><h2>往期日程</h2></div><EventRows events={past}/></section>}</div><section className="panel"><div className="panel-head"><h2>时间待定</h2><span className="count-caption">{pending.length} 项</span></div>{pending.length?pending.map(i=><a className="pending-row" key={i.id} href={'/items/'+i.id}>{i.title}<span>待定</span></a>):<Blank title="暂无待定事项"/>}</section></div></>;
+}

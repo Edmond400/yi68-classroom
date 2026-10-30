@@ -1,0 +1,3 @@
+'use client';
+export async function api(path:string,body?:unknown,method='POST'){const response=await fetch(path,{method:body===undefined?'GET':method,credentials:'same-origin',cache:'no-store',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const data:any=await response.json();if(!response.ok)throw new Error(data.error||'操作未完成，请重试。');return data}
+export function registerTool(tool: any) {const ctx=(document as any).modelContext;if(!ctx?.registerTool)return ()=>{};const life=new AbortController();try{Promise.resolve(ctx.registerTool(tool,{signal:life.signal})).catch(()=>{})}catch{}return ()=>life.abort()}

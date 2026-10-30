@@ -1,0 +1,10 @@
+{$SITE_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy app:3000 {
+        # Strip headers that an unauthenticated client must not control.
+        header_up -oai-authenticated-user-id
+        header_up -oai-authenticated-user-email
+        header_up -oai-authenticated-user-full-name
+        header_up CF-Connecting-IP {remote_host}
+    }
+}

@@ -1,0 +1,9 @@
+import { getPublicData } from '@/lib/data';
+import { dayLabel } from '@/lib/model';
+import { Blank, Unavailable } from '@/components/public-ui';
+export const dynamic = 'force-dynamic';
+export const metadata = { title: '班务日志' };
+export default async function Journal({searchParams}:{searchParams:Promise<{date?:string}>}) {
+ const {date}=await searchParams; let data;try{data=await getPublicData()}catch{return <Unavailable/>} const entries=data.progress.filter(p=>!date||p.day===date); const days=[...new Set(entries.map(p=>p.day))];
+ return <><div className="page-heading"><div><p className="eyebrow">CLASS JOURNAL</p><h1>班务日志</h1></div><span className="small muted">每一步，留有记录</span></div><div className="list-header"><p className="small muted">点击事项，查看最新方案与推进历程。</p><form method="get" className="field-inline"><label htmlFor="journal-date">查看日期</label><input id="journal-date" aria-label="日志日期" name="date" type="date" defaultValue={date}/><button className="btn secondary small-btn" type="submit">查看</button>{date&&<a href="/journal" className="text-link">全部</a>}</form></div>{days.length?days.map(day=><section className="journal-day" key={day}><div className="journal-day-head"><h2>{dayLabel(day)}<span className="small muted" style={{marginLeft:10}}>{day.slice(0,4)}</span></h2><small>{entries.filter(p=>p.day===day).length} 项推进</small></div><div className="panel">{entries.filter(p=>p.day===day).map(p=><article className="timeline-entry" key={p.id}><a href={'/items/'+p.item_id} className="row-title">{p.title} ↗</a><p className="journal-summary" style={{marginTop:8}}>{p.summary}</p>{p.next_step&&<p className="extra"><b>下一步：</b>{p.next_step}</p>}{p.cooperation&&<p className="extra"><b>需要配合：</b>{p.cooperation}</p>}</article>)}</div></section>):<div className="panel"><Blank title="这一天暂无已发布记录" description="可以选择其他日期，或返回全部日志。"/></div>}</>;
+}

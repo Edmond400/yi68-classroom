@@ -1,0 +1,4 @@
+'use client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+export function Field({label,children,hint}:{label:string;children:React.ReactNode;hint?:string}){return <label className="field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>}
+export function Choice({value,onChange,options,label}:{value:string;onChange:(v:string)=>void;options:(string|{value:string;label:string})[];label:string}){return <Select value={value||undefined} onValueChange={onChange}><SelectTrigger aria-label={label} className="select-control"><SelectValue placeholder="请选择"/></SelectTrigger><SelectContent>{options.map(o=>{const v=typeof o==='string'?o:o.value;return <SelectItem value={v} key={v}>{typeof o==='string'?o:o.label}</SelectItem>})}</SelectContent></Select>}

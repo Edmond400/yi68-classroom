@@ -1,0 +1,7 @@
+import { readAttachment, deleteAttachment } from '@/lib/attachment-storage';
+import { getActor } from '@/lib/auth';
+import { database } from '@/lib/data';
+import { HttpError, fail, json, sameOrigin } from '@/lib/http';
+export const dynamic='force-dynamic';
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;const asset=await database().prepare('SELECT a.*,i.published FROM assets a JOIN items i ON i.id=a.item_id WHERE a.id=?').bind(id).first<{id:string;filename:string;mime:string;size:number;published:number}>();if(!asset)throw new HttpError(404,'附件不存在。');if(!asset.published&&!(await getActor())?.isAdmin)throw new HttpError(404,'附件不存在。');const file=await readAttachment(id,asset.size);if(!file)throw new HttpError(404,'附件不存在。');return new Response(file,{headers:{'Content-Type':asset.mime,'Content-Disposition':(asset.mime.startsWith('image/')?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(asset.filename),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}})}catch(e){return fail(e)}}
+export async function DELETE(request:Request,{params}:{params:Promise<{id:string}>}){try{if(!(await getActor())?.isAdmin)throw new HttpError(403,'无管理权限。');sameOrigin(request);const {id}=await params;await deleteAttachment(id);return json({ok:true})}catch(e){return fail(e)}}
