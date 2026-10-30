@@ -11,7 +11,7 @@ export type Student = { id: string; student_id: string; name: string; role: stri
 export type AccountRecord = { student_id: string; name: string; enabled: number; id: string | null; status: string | null; role: string | null; created_at: string | null };
 export const accountName = z.string().trim().min(2, '请填写名册中的完整姓名。').max(50);
 export const studentId = z.string().trim().regex(/^\d{10}$/, '请填写10位学号。');
-export const password = z.string().min(10, '密码至少10位。').max(128, '密码最多128位。');
+export const password = z.string().min(4, '密码至少4位。').max(128, '密码最多128位。');
 const rosterSchema = z.array(z.object({ name: accountName, student_id: studentId }).strict()).min(1).max(200);
 
 export async function seedRoster() {
