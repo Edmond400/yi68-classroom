@@ -1,0 +1,5 @@
+export function bjTime(iso:string){return new Date(iso).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}
+export function localInput(iso:string){return new Date(Date.parse(iso)+8*3600000).toISOString().slice(0,16)}
+export function fromLocal(value:string){return new Date(value+':00+08:00').toISOString()}
+export const statusLabels:Record<string,string>={pending:'等待审核',approved:'已核实',rejected:'未通过',void:'已作废'};
+export function IncentiveRules(){return <details className="panel incentive-rules"><summary>参与记录与感谢规则</summary><ul><li>每期统计至月底北京时间13:00；十月首期从10月1日开始，之后从上月月底13:00连续计算。</li><li>实际参加几天，分别记录几次；同一任务同一天只计一次。每人每篇连续公众号任务最多计两次，跨月不重置。</li><li>班委的本职组织活动保留记录、不计奖；其他参与正常计次。月奖连续获得两期后，下一期暂停参评，再下一期恢复。</li><li>月奖按有效次数取前三名，只有争夺剩余名额的并列组参加等概率抽取。不足三人按实际人数奖励，每人15元瑞幸礼品卡。</li><li>漏记及截止后才通过审核的申报顺延下一期，已经公布的结果保持不变。</li><li>学期从2026年10月1日起统计，暂定2027年1月15日13:00截止，取前十名获班级文创；并列处理及公众号上限相同。实际截止时间以上方公告为准。</li><li>个人记录与次数不公开。转盘候选人使用当期匿名编号，最终获奖名单公开姓名。礼品发放请等候微信通知。</li></ul></details>}

@@ -6,14 +6,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { api } from '@/lib/client';
 import { Field } from './forms';
 
-export function AccountAccess({ destination = '/feedback' }: { destination?: string }) {
+export function AccountAccess({ destination = '/participation' }: { destination?: string }) {
   const [tab, setTab] = useState('login');
   const [message, setMessage] = useState('');
   return <><Tabs value={tab} onValueChange={v => { setTab(v); setMessage(''); }}>
-    <TabsList className="account-tabs"><TabsTrigger value="login">账号登录</TabsTrigger><TabsTrigger value="register">首次注册</TabsTrigger><TabsTrigger value="reset">找回密码</TabsTrigger></TabsList>
+    <TabsList className="account-tabs"><TabsTrigger value="login">账号登录</TabsTrigger><TabsTrigger value="register">首次激活</TabsTrigger><TabsTrigger value="reset">找回密码</TabsTrigger></TabsList>
     {message && <p className="callout form-status" role="status">{message}</p>}
     <TabsContent value="login"><CredentialForm mode="login" destination={destination}/></TabsContent>
-    <TabsContent value="register"><p className="small muted">填写名册中的姓名和学号，设置你自己的密码。每个学号只能注册一次。</p><CredentialForm mode="register" destination={destination}/></TabsContent>
+    <TabsContent value="register"><p className="small muted">请先向班长领取本人一次性激活码，再填写名册姓名与学号、设置自己的密码。每个学号仅激活一次。</p><CredentialForm mode="register" destination={destination}/></TabsContent>
     <TabsContent value="reset"><p className="small muted">请联系班长核实身份并获取一次性重置码，重置码30分钟内有效。</p><PasswordForm mode="reset" onDone={() => { setTab('login'); setMessage('密码已重置，请使用新密码登录。'); }}/></TabsContent>
   </Tabs></>;
 }
@@ -22,22 +22,23 @@ function PasswordInput({ value, onChange, label, current = false }: { value: str
   return <Field label={label} hint={current ? undefined : '10–128位，可使用中文、字母、数字和符号。'}><div className="password-input"><input required type={visible ? 'text' : 'password'} minLength={current ? 1 : 10} maxLength={128} autoComplete={current ? 'current-password' : 'new-password'} value={value} onChange={e => onChange(e.target.value)}/><button type="button" onClick={() => setVisible(v => !v)} aria-label={visible ? '隐藏密码' : '显示密码'}>{visible ? '隐藏' : '显示'}</button></div></Field>;
 }
 function CredentialForm({ mode, destination }: { mode: 'login' | 'register'; destination: string }) {
-  const [name, setName] = useState(''), [studentId, setId] = useState(''), [password, setPassword] = useState(''), [confirm, setConfirm] = useState('');
+  const [name, setName] = useState(''), [studentId, setId] = useState(''), [password, setPassword] = useState(''), [confirm, setConfirm] = useState(''), [activationCode,setActivationCode] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const router = useRouter();
   return <form onSubmit={async e => {
     e.preventDefault(); if (busy) return; setError('');
     if (mode === 'register' && password !== confirm) { setError('两次输入的密码不一致。'); return; }
     setBusy(true);
-    try { await api('/api/account', { action: mode, student_id: studentId, password, ...(mode === 'register' ? { name } : {}) }); router.push(destination); router.refresh(); }
+    try { await api('/api/account', { action: mode, student_id: studentId, password, ...(mode === 'register' ? { name,activation_code:activationCode.trim() } : {}) }); router.push(destination); router.refresh(); }
     catch (e) { setError((e as Error).message); setBusy(false); }
   }}>
     {mode === 'register' && <Field label="姓名"><input required minLength={2} maxLength={50} autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="与班级名册一致"/></Field>}
     <Field label="学号"><input required inputMode="numeric" pattern="[0-9]{10}" maxLength={10} autoComplete="username" value={studentId} onChange={e => setId(e.target.value)} placeholder="10位学号"/></Field>
+    {mode === 'register' && <Field label="本人一次性激活码"><input required autoComplete="off" maxLength={64} value={activationCode} onChange={e=>setActivationCode(e.target.value)} placeholder="私下领取，请勿公开"/></Field>}
     <PasswordInput label={mode === 'login' ? '密码' : '设置密码'} value={password} onChange={setPassword} current={mode === 'login'}/>
     {mode === 'register' && <Field label="确认密码"><input required type="password" minLength={10} maxLength={128} autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)}/></Field>}
     {error && <p className="callout error form-status" role="alert">{error}</p>}
-    <div className="form-actions"><button className="btn" type="submit" disabled={busy}>{busy ? '正在验证…' : mode === 'login' ? '登录' : '注册并登录'}</button></div>
+    <div className="form-actions"><button className="btn" type="submit" disabled={busy}>{busy ? '正在验证…' : mode === 'login' ? '登录' : '激活并登录'}</button></div>
   </form>;
 }
 function PasswordForm({ mode, onDone }: { mode: 'change' | 'reset'; onDone: () => void }) {

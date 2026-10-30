@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "yi68-classroom",
-  "main": "vinext/server/fetch-handler",
+  "main": "worker.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": [
     "nodejs_compat"
@@ -20,5 +20,10 @@
       "database_name": "yi68-classroom",
       "migrations_dir": "drizzle"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }

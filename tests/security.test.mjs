@@ -109,7 +109,7 @@ assert.equal((await app.admin.POST(req('/api/admin',{entity:'item',value:draft},
 assert.equal((await postAdmin({entity:'item',value:{...draft,data:{...draft.data,sourceUrl:'javascript:alert(1)'}}})).status,400);
 assert.equal((await postAdmin({entity:'progress',value:{...log,day:'2026-02-30'}})).status,400);
 check('legacy management still rejects cross-site writes, unsafe links and invalid dates');
-const migrated=await (await app.backup.GET()).json();assert.equal(migrated.format,'yi68-backup-v2');assert.equal(migrated.data.birthday_responses.length,28);assert.equal(migrated.data.administrator.length,1);assert(!migrated.data.administrator_sessions);assert(!migrated.data.student_sessions);
+const migrated=await (await app.backup.GET()).json();assert.equal(migrated.format,'yi68-backup-v3');assert.equal(migrated.data.birthday_responses.length,28);assert.equal(migrated.data.administrator.length,1);assert(!migrated.data.administrator_sessions);assert(!migrated.data.student_sessions);
 const temporary=mkdtempSync(resolve(tmpdir(),'yi68-migration-'));
 try{
  const backupPath=resolve(temporary,'private.backup.json');writeFileSync(backupPath,JSON.stringify(migrated),{mode:0o600});

@@ -3,7 +3,7 @@ import { getActor } from '@/lib/auth';
 import { database } from '@/lib/data';
 import { json, fail, HttpError } from '@/lib/http';
 export const dynamic = 'force-dynamic';
-const tables = ['settings', 'items', 'progress', 'events', 'class_roster', 'student_accounts', 'feedback', 'assets', 'administrator', 'birthday_responses'] as const;
+const tables = ['settings', 'items', 'progress', 'events', 'class_roster', 'student_accounts', 'feedback', 'assets', 'administrator', 'birthday_responses', 'incentive_members', 'incentive_tasks', 'incentive_activities', 'incentive_participations', 'incentive_counts', 'incentive_claims', 'incentive_periods', 'incentive_draw_codes', 'incentive_audit'] as const;
 export async function GET() {
   try {
     if (!(await getActor())?.isAdmin) throw new HttpError(403, '仅班长可以导出数据。');
@@ -22,7 +22,7 @@ export async function GET() {
       if (!file) throw new HttpError(409, '有附件暂时无法读取，请稍后重试。');
       files.push({ id: asset.id, base64: Buffer.from(file).toString('base64') });
     }
-    const result = json({ format: 'yi68-backup-v2', exported_at: new Date().toISOString(), data, files });
+    const result = json({ format: 'yi68-backup-v3', exported_at: new Date().toISOString(), data, files });
     result.headers.set('Content-Disposition', 'attachment; filename="yi68-private.backup.json"');
     return result;
   } catch (error) { return fail(error); }
