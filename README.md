@@ -12,6 +12,7 @@
 git clone https://github.com/Edmond400/yi68-classroom.git
 cd yi68-classroom
 pnpm install --frozen-lockfile
+python -m pip install python-pptx==1.0.2
 pnpm check
 pnpm test
 pnpm build
