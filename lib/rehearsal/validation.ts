@@ -1,0 +1,15 @@
+import {z} from 'zod';
+const id=z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
+const nonnegative=z.number().finite().min(0).max(300);
+export const configSchema=z.object({version:z.string().max(100),baseUnitsPerMinute:z.number().finite().min(60).max(600),commaSeconds:nonnegative,endmarkSeconds:nonnegative,colonSemiSeconds:nonnegative,paragraphEndSeconds:nonnegative,slideSwitchSeconds:nonnegative,handoffSeconds:nonnegative,operationSeconds:nonnegative,chartExtraSeconds:nonnegative,formulaExtraSeconds:nonnegative,planningSeconds:z.number().int().min(60).max(10800),hardLimitSeconds:z.number().int().min(60).max(10800),personalBufferRate:z.number().min(0).max(.2),ratioClip:z.tuple([z.number().min(.1).max(1),z.number().min(1).max(3)])}).strict();
+export const projectSchema=z.object({
+ revision:z.number().int().min(0),title:z.string().trim().min(1).max(160),theme:z.string().max(1000),status:z.enum(['draft','published','ended']),publishedAt:z.string().datetime().nullable(),
+ members:z.array(z.object({id,name:z.string().trim().min(1).max(60),enabled:z.boolean()}).strict()).max(30),
+ blocks:z.array(z.object({id,paragraphId:id,sourceStart:z.number().int().min(0).max(10000000).optional(),sourceEnd:z.number().int().min(0).max(10000000).optional(),text:z.string().max(20000),memberId:id.nullable(),nonspoken:z.boolean(),slideIndex:z.number().int().min(0).max(199).nullable(),paragraphEnd:z.boolean(),spokenText:z.string().max(20000).optional(),spellOut:z.array(z.string().regex(/^[A-Za-z'-]{1,30}$/)).max(50).optional(),manualSpeechSeconds:nonnegative.optional(),longPause:nonnegative.optional(),chartAction:z.boolean().optional(),formulaAction:z.boolean().optional(),extraSeconds:nonnegative.optional(),actionId:id.optional()}).strict()).max(500),
+ sourceDeck:z.object({id,pages:z.array(z.string().regex(/^ppt\/slides\/[^/]+\.xml$/)).min(1).max(200),bytes:z.number().int().positive().max(20971520)}).strict().optional(),
+ slides:z.array(z.object({sourcePage:z.string().regex(/^ppt\/slides\/[^/]+\.xml$/).optional(),id,mime:z.enum(['image/jpeg','image/png','image/webp']),pageIndex:z.number().int().min(0).max(199),bytes:z.number().int().positive().max(2097152)}).strict()).max(200),
+ config:configSchema,overrides:z.record(z.object({seconds:z.number().finite().min(0).max(10800),reason:z.string().trim().min(1).max(500)}).strict()),
+}).strict();
+export const recordingSchema=z.object({id:z.string().uuid(),memberId:id,turnId:id,scriptVersion:z.string().max(100),deckVersion:z.string().max(100),algorithmVersion:z.string().max(100),hash:z.string().regex(/^[a-f0-9]{64}$/),durationMs:z.number().int().min(100).max(10800000),mediaDurationMs:z.number().finite().min(100).max(10800000).nullable(),clockDurationMs:z.number().int().min(100).max(10800000),events:z.unknown()}).strict();
+export const reviewSchema=z.object({id:z.string().uuid(),action:z.enum(['review','delete']),locked:z.boolean().optional(),complete:z.boolean().optional()}).strict();
+export function uniqueIds(list:{id:string}[]){return new Set(list.map(x=>x.id)).size===list.length}

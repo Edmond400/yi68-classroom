@@ -3,12 +3,7 @@ import { useRef,useState } from 'react';
 import { CheckCircle2,Send } from 'lucide-react';
 import { daysInBirthdayMonth,participationLabels,type Participation } from '@/lib/birthday-model';
 import { api } from '@/lib/client';
-function requestId(){
- if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
- const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
- const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
- return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-}
+import { surveyRequestId } from '@/lib/survey-request-id';
 export function BirthdayForm(){
  const [name,setName]=useState(''),[month,setMonth]=useState(''),[day,setDay]=useState(''),[participation,setParticipation]=useState<Participation|''>('');
  const [busy,setBusy]=useState(false),[done,setDone]=useState(false),[error,setError]=useState('');
@@ -18,7 +13,7 @@ export function BirthdayForm(){
   if(!name.trim()||!month||!day||!participation){setError('请完整填写姓名、生日和参与意愿。');return}
   if(Number(day)>daysInBirthdayMonth(Number(month))){setError('请填写有效的公历生日。');return}
   const signature=JSON.stringify([name.trim(),month,day,participation]);
-  try{if(submitted.current!==signature){key.current=requestId();submitted.current=signature}}catch{setError('当前浏览器无法生成提交标识，请使用更新的浏览器。');return}
+  try{if(submitted.current!==signature){key.current=surveyRequestId();submitted.current=signature}}catch{setError('当前浏览器无法生成提交标识，请使用更新的浏览器。');return}
   sending.current=true;setBusy(true);
   try{await api('/api/survey/birthday',{name:name.trim(),month:Number(month),day:Number(day),participation,request_key:key.current});setDone(true)}catch(e){setError((e as Error).message)}finally{sending.current=false;setBusy(false)}
  }

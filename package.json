@@ -7,21 +7,24 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "pnpm check && node tests/security.test.mjs && node tests/color-homework.test.mjs && node tests/sketch-homework.test.mjs && node tests/r2-attachments.test.mjs && node tests/public-albums.test.mjs && node tests/album-export.test.mjs && node tests/drink-orders.test.mjs && node tests/talent-survey.test.mjs && node tests/song-requests.test.mjs && node scripts/prepare-rehearsal-assets.mjs && vite build",
     "start": "wrangler dev --local",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "build:server": "YI68_NODE_BUILD=1 NEXT_TELEMETRY_DISABLED=1 next build --webpack",
     "start:server": "YI68_NODE_BUILD=1 next start",
-    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "deploy": "node scripts/predeploy-storage.mjs && node scripts/predeploy-drinks.mjs && node scripts/predeploy-public-albums.mjs && wrangler d1 migrations apply DB --remote && wrangler deploy && node scripts/public-albums-production-smoke.mjs && node scripts/drinks-production-smoke.mjs && node scripts/talent-production-smoke.mjs && node scripts/song-production-smoke.mjs && node scripts/color-homework-production-smoke.mjs && node scripts/sketch-homework-production-smoke.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "test": "node tests/security.test.mjs && node tests/node-runtime.test.mjs && node tests/d1-attachments.test.mjs && node tests/incentives.test.mjs",
-    "check": "tsc --noEmit"
+    "test": "node tests/security.test.mjs && node tests/node-runtime.test.mjs && node tests/d1-attachments.test.mjs && node tests/r2-attachments.test.mjs && node tests/favorite-character-survey.test.mjs && node tests/incentives.test.mjs && node tests/client-network.test.mjs && node tests/activity-admins.test.mjs && node tests/nicknames-simulation.test.mjs && node tests/reward-playback.test.mjs && pnpm test:rehearsal && pnpm test:monthly-rewards",
+    "check": "tsc --noEmit",
+    "test:rehearsal": "node scripts/prepare-rehearsal-assets.mjs && node tests/rehearsal-algorithm.test.mjs && node tests/rehearsal-migration.test.mjs && node tests/rehearsal-d1.test.mjs && node tests/rehearsal-multi.test.mjs && node tests/rehearsal-pptx.test.mjs && node tests/rehearsal-reading-pdf.test.mjs && node tests/rehearsal-editing.test.mjs && node tests/rehearsal-slide-cache.test.mjs && node tests/rehearsal-audio.test.mjs",
+    "test:monthly-rewards": "node tests/monthly-reward-d1.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
+    "@pdf-lib/fontkit": "1.1.1",
     "@shadcn/react": "^0.3.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -29,10 +32,14 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "0.45.2",
     "embla-carousel-react": "^8.6.0",
+    "fflate": "0.8.2",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.31.0",
+    "mammoth": "1.11.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "5.4.624",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
     "react-day-picker": "^10.0.1",
@@ -75,12 +82,16 @@
   "cloudflare": {
     "bindings": {
       "DB": {
-        "description": "Private class data, birthday responses and chunked attachment bytes. No R2 required."
+        "description": "Structured class records and attachment indexes; file bytes use private R2."
       },
       "ADMIN_BOOTSTRAP_TOKEN_HASH": {
         "description": "SHA-256 digest of a private one-time administrator setup code. No default admin password."
       }
     }
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Edmond400/yi68-classroom.git"
+  }
 }

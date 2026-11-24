@@ -2,41 +2,59 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, KeyRound } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { api } from '@/lib/client';
+import type { Student } from '@/lib/accounts';
+import { clearStudentSession, saveStudentSession } from '@/lib/student-session';
 import { Field } from './forms';
 
-export function AccountAccess({ destination = '/participation' }: { destination?: string }) {
-  const [tab, setTab] = useState('login');
+export function AccountAccess({ onLogin, initialError = '' }: { onLogin: (student:Student)=>void; initialError?: string }) {
+  const [flow,setFlow]=useState<{name:string;mode:'login'|'register'}|null>(null);
+  const [name,setName]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(initialError);
+  const [showReset, setShowReset] = useState(false);
   const [message, setMessage] = useState('');
-  return <><Tabs value={tab} onValueChange={v => { setTab(v); setMessage(''); }}>
-    <TabsList className="account-tabs"><TabsTrigger value="login">账号登录</TabsTrigger><TabsTrigger value="register">首次激活</TabsTrigger><TabsTrigger value="reset">找回密码</TabsTrigger></TabsList>
+  async function identify(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault();if(busy)return;setBusy(true);setError('');setMessage('');
+    try{
+      const result=await api('/api/account',{action:'identify',name:name.trim()});
+      if(result.mode!=='login'&&result.mode!=='register')throw new Error('账号状态有误，请稍后重试。');
+      setFlow({name:name.trim(),mode:result.mode});
+    }catch(e){setError((e as Error).message)}finally{setBusy(false)}
+  }
+  return <>
     {message && <p className="callout form-status" role="status">{message}</p>}
-    <TabsContent value="login"><CredentialForm mode="login" destination={destination}/></TabsContent>
-    <TabsContent value="register"><p className="small muted">请先向班长领取本人一次性激活码，填写名册中的姓名并设置密码即可，无需填写学号。</p><CredentialForm mode="register" destination={destination}/></TabsContent>
-    <TabsContent value="reset"><p className="small muted">请联系班长核实身份并获取一次性重置码，重置码30分钟内有效。</p><PasswordForm mode="reset" onDone={() => { setTab('login'); setMessage('密码已重置，请使用新密码登录。'); }}/></TabsContent>
-  </Tabs></>;
+    {error && <p className="callout error form-status" role="alert">{error}</p>}
+    {!flow ? <form onSubmit={identify}><Field label="姓名"><input required name="name" minLength={2} maxLength={50} autoComplete="username" value={name} onChange={e=>setName(e.target.value)} placeholder="请输入班级名册中的姓名"/></Field><div className="form-actions"><button className="btn" disabled={busy}>{busy?'正在确认账号…':'下一步'}</button></div></form> : <>
+      <p className="form-status"><strong>{flow.name}</strong>{showReset?'，重新设置账号密码。':flow.mode==='login'?'，您的账号已激活，请输入密码登录。':'，您的账号尚未激活，请输入激活码并设置密码。'}</p>
+      {showReset ? <><p className="small muted">请联系班长核实身份并获取一次性重置码，重置码30分钟内有效。</p><PasswordForm mode="reset" onDone={() => { clearStudentSession();setShowReset(false);setError('');setMessage('密码已重置，请使用新密码登录。'); }}/><p className="small"><a className="text-link" href="#login" onClick={e=>{e.preventDefault();setShowReset(false)}}>返回密码登录</a></p></> : <CredentialForm mode={flow.mode} name={flow.name} onLogin={onLogin} onForgot={()=>{setError('');setMessage('');setShowReset(true)}}/>}
+      <button className="text-link small" type="button" onClick={()=>{setFlow(null);setShowReset(false);setError('');setMessage('')}}>更换姓名</button>
+    </>}
+  </>;
 }
-function PasswordInput({ value, onChange, label, current = false }: { value: string; onChange: (v: string) => void; label: string; current?: boolean }) {
+function PasswordInput({ value, onChange, label, current = false, name }: { value: string; onChange: (v: string) => void; label: string; current?: boolean; name?: string }) {
   const [visible, setVisible] = useState(false);
-  return <Field label={label} hint={current ? undefined : '4–128位，可使用中文、字母、数字和符号。'}><div className="password-input"><input required type={visible ? 'text' : 'password'} minLength={4} maxLength={128} autoComplete={current ? 'current-password' : 'new-password'} value={value} onChange={e => onChange(e.target.value)}/><button type="button" onClick={() => setVisible(v => !v)} aria-label={visible ? '隐藏密码' : '显示密码'}>{visible ? '隐藏' : '显示'}</button></div></Field>;
+  return <Field label={label} hint={current ? undefined : '4–128位，可使用中文、字母、数字和符号。'}><div className="password-input"><input required name={name} type={visible ? 'text' : 'password'} minLength={4} maxLength={128} autoComplete={current ? 'current-password' : 'new-password'} value={value} onChange={e => onChange(e.target.value)}/><button type="button" onClick={() => setVisible(v => !v)} aria-label={visible ? '隐藏密码' : '显示密码'}>{visible ? '隐藏' : '显示'}</button></div></Field>;
 }
-function CredentialForm({ mode, destination }: { mode: 'login' | 'register'; destination: string }) {
-  const [name, setName] = useState(''), [password, setPassword] = useState(''), [activationCode,setActivationCode] = useState('');
+function CredentialForm({ mode, name, onLogin, onForgot }: { mode: 'login' | 'register'; name: string; onLogin: (student:Student)=>void; onForgot:()=>void }) {
+  const [password,setPassword]=useState(''),[activationCode,setActivationCode]=useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const router = useRouter();
   return <form onSubmit={async e => {
-    e.preventDefault(); if (busy) return; setError('');
+    e.preventDefault();if (busy) return;setError('');
     if (mode === 'register' && !window.confirm('请确认你已记住刚设置的密码。是否使用这个密码激活账号并登录？')) return;
     setBusy(true);
-    try { await api('/api/account', { action: mode, name:name.trim(), password, ...(mode === 'register' ? { activation_code:activationCode.trim() } : {}) }); router.push(destination); router.refresh(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    try {
+      const result=await api('/api/account',{action:mode,name,password,...(mode==='register'?{activation_code:activationCode.trim()}:{})});
+      if(result.session_token)saveStudentSession(result.session_token);
+      const verified=await api('/api/account');
+      if(!verified.student){clearStudentSession();throw new Error('未能建立登录会话，请重新登录。');}
+      onLogin(verified.student);
+    } catch(e){setError((e as Error).message)}finally{setBusy(false)}
   }}>
-    <Field label="姓名"><input required minLength={2} maxLength={50} autoComplete={mode==='login'?'username':'name'} value={name} onChange={e=>setName(e.target.value)} placeholder="与班级名册一致"/></Field>
-    {mode === 'register' && <Field label="本人一次性激活码"><input required autoComplete="off" maxLength={64} value={activationCode} onChange={e=>setActivationCode(e.target.value)} placeholder="私下向班长领取"/></Field>}
-    <PasswordInput label={mode === 'login' ? '密码' : '设置密码'} value={password} onChange={setPassword} current={mode === 'login'}/>
+    <input type="hidden" name="name" value={name} autoComplete="username"/>
+    {mode==='register' && <Field label="本人一次性激活码"><input required name="activation_code" autoComplete="off" maxLength={64} value={activationCode} onChange={e=>setActivationCode(e.target.value)} placeholder="私下向班长领取"/></Field>}
+    <PasswordInput name="password" label={mode==='login'?'密码':'设置密码'} value={password} onChange={setPassword} current={mode==='login'}/>
+    {mode==='login' && <p className="small"><a className="text-link" href="#forgot-password" onClick={e=>{e.preventDefault();onForgot()}}>忘记密码？</a></p>}
     {error && <p className="callout error form-status" role="alert">{error}</p>}
-    <div className="form-actions"><button className="btn" type="submit" disabled={busy}>{busy ? '正在验证…' : mode === 'login' ? '登录' : '激活并登录'}</button></div>
+    <div className="form-actions"><button className="btn" type="submit" disabled={busy}>{busy ? '正在验证…' : mode==='login'?'登录':'激活并登录'}</button></div>
   </form>;
 }
 function PasswordForm({ mode, onDone }: { mode: 'change' | 'reset'; onDone: () => void }) {
@@ -56,12 +74,11 @@ function PasswordForm({ mode, onDone }: { mode: 'change' | 'reset'; onDone: () =
     <div className="form-actions"><button type="submit" disabled={busy} className="btn">{busy ? '正在更新…' : '更新密码并重新登录'}</button></div>
   </form>;
 }
-export function AccountControls({ name }: { name: string }) {
+export function AccountControls({ name, onSignedOut }: { name: string; onSignedOut:()=>void }) {
   const [change, setChange] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const router = useRouter();
-  return <div className="account-controls"><div className="account-controls-row"><span>已登录：<strong>{name}</strong></span><div><button type="button" className="text-link" onClick={() => setChange(v => !v)}><KeyRound size={15}/>修改密码</button><button type="button" className="text-link" disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/account', { action: 'logout' }); router.refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><LogOut size={15}/>退出</button></div></div>
+  return <div className="account-controls"><div className="account-controls-row"><span>已登录：<strong>{name}</strong></span><div><button type="button" className="text-link" onClick={() => setChange(v => !v)}><KeyRound size={15}/>修改密码</button><button type="button" className="text-link" disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/account', { action: 'logout' }); clearStudentSession();onSignedOut(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><LogOut size={15}/>退出</button></div></div>
     {error && <p className="callout error form-status" role="alert">{error}</p>}
-    {change && <PasswordForm mode="change" onDone={() => router.refresh()}/>}
+    {change && <PasswordForm mode="change" onDone={() => {clearStudentSession();onSignedOut()}}/>}
   </div>;
 }
 export function AdminClaim() {

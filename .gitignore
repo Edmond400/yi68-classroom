@@ -56,3 +56,18 @@ next-env.d.ts
 .dev.vars*
 !.dev.vars.example
 /cloudflare-release/
+
+# Reconstructed from checked source assets and the pinned PDF.js package.
+/public/fonts/NotoSansSC-Reading.ttf.gz
+/public/vendor/pdf.worker-5.4.624.min.mjs
+
+# Private runtime data and credentials
+*.sqlite*
+*.db
+*.backup.json
+*.jks
+*.keystore
+*.pem
+*.key
+/backups/
+/private/

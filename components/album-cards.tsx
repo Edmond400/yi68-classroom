@@ -1,0 +1,2 @@
+import type { Album } from '@/lib/albums';
+export function AlbumCards({albums}:{albums:Album[]}){return <div className="album-list">{albums.map(a=><a className="album-card panel" href={'/albums/'+a.id} key={a.id}>{a.cover_photo_id?<img src={`/api/albums/photos/${a.cover_photo_id}?preview=1`} alt={a.title} loading="lazy" decoding="async"/>:<div className="album-cover-empty">相聚时光</div>}<div className="album-card-copy"><h2>{a.title}</h2><p><time>{a.activity_date}</time><span>{a.photo_count} 张照片</span></p></div></a>)}</div>}

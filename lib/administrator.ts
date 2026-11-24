@@ -10,9 +10,13 @@ export function adminCookieToken(cookie:string) {
  const value=cookie.split(';').map(s=>s.trim()).find(s=>s.startsWith(ADMIN_COOKIE+'='))?.slice(ADMIN_COOKIE.length+1);
  return value && /^[a-f0-9]{64}$/.test(value) ? value : null;
 }
+export function administratorToken(requestHeaders:Headers){
+ const authorization=requestHeaders.get('authorization');
+ if(authorization!==null)return /^Bearer ([a-f0-9]{64})$/i.exec(authorization)?.[1]||null;
+ return adminCookieToken(requestHeaders.get('cookie')||'');
+}
 export async function getAdministrator(request?:Request):Promise<Administrator|null> {
- const cookie=request?request.headers.get('cookie'):(await headers()).get('cookie');
- const token=adminCookieToken(cookie||'');
+ const token=administratorToken(request?request.headers:await headers());
  if(!token)return null;
  return database().prepare('SELECT a.id,a.username,a.credential_version FROM administrator_sessions s JOIN administrator a ON a.id=s.admin_id AND a.credential_version=s.credential_version WHERE s.token_hash=? AND s.expires_at>?').bind(digest(token),Date.now()).first<Administrator>();
 }
@@ -29,11 +33,11 @@ export async function rateLimit(request:Request,scope:string,limit:number,second
  await db.prepare('DELETE FROM auth_attempts WHERE expires_at<?').bind(now).run();
 }
 export function adminCookie(response:Response,token='',seconds=0){response.headers.set('Set-Cookie',`${ADMIN_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${seconds}`);return response;}
-export async function createAdministratorSession(expectedHash:string){
+export async function createAdministratorSession(expectedHash:string,bearer=false){
  const db=database(),token=randomToken();
  const inserted=await db.prepare("INSERT INTO administrator_sessions (token_hash,admin_id,credential_version,expires_at) SELECT ?,id,credential_version,? FROM administrator WHERE id='primary' AND password_hash=?").bind(digest(token),Date.now()+SESSION_SECONDS*1000,expectedHash).run();
  if(!inserted.meta.changes)throw new HttpError(401,'账号已更新，请重新登录。');
  await db.prepare('DELETE FROM administrator_sessions WHERE expires_at<?').bind(Date.now()).run();
- return adminCookie(json({ok:true}),token,SESSION_SECONDS);
+ return adminCookie(json({ok:true,...(bearer?{session_token:token}:{})}),token,SESSION_SECONDS);
 }
 export function setupTokenHash(){return env.ADMIN_BOOTSTRAP_TOKEN_HASH;}

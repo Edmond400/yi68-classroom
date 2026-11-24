@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { randomUUID, createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const require = createRequire(import.meta.url), { build } = require(require.resolve('esbuild', { paths: [dirname(require.resolve('wrangler/package.json'))] }));
+const sqlite = new DatabaseSync(':memory:');
+sqlite.exec(readFileSync('drizzle/0021_song_requests.sql', 'utf8'));
+sqlite.exec('CREATE TABLE administrator(id TEXT PRIMARY KEY,username TEXT,password_hash TEXT,credential_version TEXT); CREATE TABLE administrator_sessions(token_hash TEXT PRIMARY KEY,admin_id TEXT,credential_version TEXT,expires_at INTEGER)');
+function prepared(sql, p = []) { return { bind(...v) { return prepared(sql, v); }, async first() { return sqlite.prepare(sql).get(...p) || null; }, async all() { return { results: sqlite.prepare(sql).all(...p) }; }, async run() { return { meta: { changes: Number(sqlite.prepare(sql).run(...p).changes) } }; } }; }
+globalThis.__songTestEnv = { DB: { prepare: prepared } };
+const dir = mkdtempSync(resolve(tmpdir(), 'yi68-song-')), out = resolve(dir, 'app.mjs'), origin = 'https://yi68.test';
+await build({ stdin: { contents: `export * from './lib/song-requests'; export {GET as studentGet,POST as studentPost} from './app/song-request/route'; export {GET as adminGet,DELETE as adminDelete} from './app/api/admin/song-requests/route';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', outfile: out, plugins: [{ name: 'fixture', setup(b) { b.onResolve({ filter: /^cloudflare:workers$/ }, () => ({ path: 'env', namespace: 'fixture' })); b.onResolve({ filter: /^next\/headers$/ }, () => ({ path: 'headers', namespace: 'fixture' })); b.onLoad({ filter: /.*/, namespace: 'fixture' }, a => ({ contents: a.path === 'env' ? 'export const env=globalThis.__songTestEnv' : 'export async function headers(){return new Headers()}' })); } }] });
+try {
+  const app = await import(pathToFileURL(out).href);
+  const post = (id, song, headers = { Origin: origin }) => app.studentPost(new Request(origin + app.songPath, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers }, body: new URLSearchParams({ request_id: id, song }) }));
+  const page = () => app.studentGet(new Request(origin + app.songPath));
+  const html = await (await page()).text(), html2 = await (await page()).text();
+  assert.equal((html.match(/type="text"/g) || []).length, 1); assert(!html.includes('<script')); assert.match(html, /name="song" required/);
+  const getId = h => /name="request_id" value="([^"]+)"/.exec(h)[1]; assert.notEqual(getId(html), getId(html2));
+  const id = getId(html);
+  const retried = await Promise.all([post(id, ' 合成歌曲甲 '), post(id, '合成歌曲甲'), post(id, '合成歌曲甲')]);
+  assert(retried.every(r => r.status === 303)); assert.equal((await app.songRequests()).length, 1);
+  assert.equal((await post(id, '合成歌曲乙')).status, 409);
+  assert.equal((await post(randomUUID(), '合成歌曲甲')).status, 303);
+  assert.equal((await post(randomUUID(), '合成歌曲乙', { Referer: origin + app.songPath, 'User-Agent': 'Mobile MicroMessenger/8.0' })).status, 303);
+  const rows = await app.songRequests(); assert.deepEqual(rows.map(r => r.song), ['合成歌曲甲', '合成歌曲甲', '合成歌曲乙']);
+  assert.equal((await post(randomUUID(), '   ')).status, 400); assert.equal((await post(randomUUID(), '字'.repeat(161))).status, 400);
+  assert.equal((await post('invalid', '歌')).status, 400); assert.equal((await post(randomUUID(), '歌', { Origin: 'https://other.test' })).status, 403);
+  const failed = await (await post('invalid', '<img src=x>')).text(); assert(failed.includes('&lt;img')); assert(!failed.includes('<img'));
+  const success = await (await app.studentGet(new Request(origin + app.songPath + '?submitted=1'))).text(); assert.match(success, /点歌成功！已收到你的歌曲。/); assert.match(success, /继续点歌/); assert(!success.includes('合成歌曲甲'));
+  const token = 'c'.repeat(64), hash = createHash('sha256').update(token).digest('hex');
+  sqlite.prepare('INSERT INTO administrator VALUES (?,?,?,?)').run('primary', 'admin', 'unused', 'test'); sqlite.prepare('INSERT INTO administrator_sessions VALUES (?,?,?,?)').run(hash, 'primary', 'test', Date.now() + 60000);
+  const req = (extra = '', admin = false, body, source = origin) => new Request(origin + app.songApi + extra, { method: body ? 'DELETE' : 'GET', headers: { ...(admin ? { Authorization: 'Bearer ' + token } : {}), Origin: source, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  assert.equal((await app.adminGet(req())).status, 401); assert.equal((await app.adminGet(req('?export=csv'))).status, 401); assert.equal((await app.adminDelete(req('', false, { id: rows[0].id }))).status, 401);
+  assert.equal((await app.adminGet(req('', true))).status, 200);
+  const csv = await (await app.adminGet(req('?export=csv', true))).text(); assert.equal((csv.match(/合成歌曲甲/g) || []).length, 2); assert.match(csv, /北京时间/);
+  assert(app.songCsv([{ id: 1, song: '=1,"test"', submitted_at: new Date().toISOString() }]).includes("'=1,"));
+  assert.equal((await app.adminDelete(req('', true, { id: rows[0].id }, 'https://other.test'))).status, 403);
+  assert.equal((await app.adminDelete(req('', true, { id: rows[0].id }))).status, 200); assert.equal((await app.songRequests()).length, 2);
+  console.log('PASS song native form, concurrent retry deduplication, independent same-song submissions, ordering, validation, WeChat-UA, private results/CSV, admin deletion and origin checks');
+} finally { sqlite.close(); delete globalThis.__songTestEnv; rmSync(dir, { recursive: true, force: true }); }

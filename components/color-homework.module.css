@@ -1,0 +1,28 @@
+.panel{padding:clamp(16px,3vw,28px)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.stats div{display:flex;flex-direction:column;gap:5px}
+.stats span{font-size:14px;color:#625b6c}
+.stats strong{font-size:clamp(22px,5vw,30px)}
+.progress{display:flex;align-items:center;gap:14px;margin:12px 0}
+.progress progress{flex:1;min-width:0;accent-color:#70529b;height:12px}
+.progress span{font-size:16px;white-space:nowrap}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 12px}
+.tools input{flex:1;min-width:130px;width:100%;font-size:16px}
+.filters{display:flex;gap:6px}
+.filters button{border:1px solid #d7cede;background:white;color:#514360;border-radius:7px;padding:9px 12px;font-size:14px;cursor:pointer}
+.filters button[aria-pressed=true]{background:#70529b;color:white;border-color:#70529b}
+.head,.row{display:grid;grid-template-columns:minmax(80px,1fr) 92px 100px;gap:12px;align-items:center;padding:12px 0}
+.head{font-size:14px;color:#625b6c;border-bottom:1px solid #d7cede}
+.row{border-bottom:1px solid #ede8f1;font-size:16px}
+.name{min-width:0;overflow-wrap:anywhere}
+.name strong{font-size:16px;font-weight:600}
+.name small{display:block;font-size:14px;color:#625b6c;margin-top:5px}
+.mine{background:#f6f2fc;border-radius:8px;padding:12px 8px;margin:0 -8px}
+.row input[type=checkbox]{width:24px;height:24px;accent-color:#70529b;cursor:pointer}
+.row input[type=number]{width:100%;min-width:0;font-size:16px;padding:8px;border:1px solid #c9bfd5;border-radius:6px}
+.row input:disabled{opacity:.6;cursor:wait}
+.status{font-size:14px;color:#625b6c}
+.saved{grid-column:1/-1;font-size:14px;color:#625b6c;margin:0}
+.error{grid-column:1/-1;font-size:14px;color:#a12439;margin:0}
+.myRecord{padding:14px 16px;border:1px solid #d9cce8;border-radius:8px;margin:18px 0;background:#f9f6fd;font-size:16px}
+@media(max-width:440px){.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.head,.row{grid-template-columns:minmax(70px,1fr) 88px 86px;gap:8px}.tools{display:block}.filters{margin-top:10px}.filters button{flex:1}}

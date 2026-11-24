@@ -17,9 +17,14 @@ const compiled = await build({
     contents: `
       import { env } from 'cloudflare:workers';
       import { saveAttachment, readAttachment, deleteAttachment } from './lib/attachment-storage';
+      import { saveNickname } from './lib/nicknames';
       export default { async fetch(request) {
         const id = new URL(request.url).pathname.slice(1);
         try {
+          if (id.startsWith('nickname-')) {
+            const suffix=id.slice(-1),student_id=suffix==='a'?'2030040001':'2030040002';
+            return Response.json(await saveNickname({id,student_id,name:suffix==='a'?'测试甲':'测试乙',role:'student'},(await request.json()).nickname));
+          }
           if (request.method === 'POST') {
             const bytes = new Uint8Array(await request.arrayBuffer());
             await saveAttachment({ id, itemId: 'test-item', filename: 'binary.dat', mime: 'application/octet-stream', size: bytes.length }, bytes);
@@ -37,12 +42,12 @@ const compiled = await build({
     loader: 'ts',
   },
   absWorkingDir: root, bundle: true, write: false, platform: 'neutral', format: 'esm',
-  external: ['cloudflare:workers'],
+  external: ['cloudflare:workers','node:*'],
 });
 const options = {
   modules: true, script: compiled.outputFiles[0].text,
   compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
-  d1Databases: ['DB'], d1Persist: resolve(dir, 'd1'),
+  bindings: { ATTACHMENT_WRITES: 'd1' }, d1Databases: ['DB'], d1Persist: resolve(dir, 'd1'),
 };
 let mf;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -51,11 +56,30 @@ try {
   mf = new Miniflare(options);
   const db = await mf.getD1Database('DB');
   for (const filename of readdirSync(resolve(root, 'drizzle')).filter(f => f.endsWith('.sql')).sort()) {
-    for (const sql of readFileSync(resolve(root, 'drizzle', filename), 'utf8').split(';').map(s => s.trim()).filter(Boolean)) {
+    for (const sql of (readFileSync(resolve(root, 'drizzle', filename), 'utf8').match(/\s*CREATE TRIGGER\b[\s\S]*?\bEND;|[^;]+;/gi)??[])) {
       await db.prepare(sql).run();
     }
   }
   await db.prepare("INSERT INTO items VALUES ('test-item','task','test','{}',0,'test','test')").run();
+  await assert.rejects(db.batch([
+    db.prepare('INSERT INTO incentive_write_guards(id,allowed) VALUES (?,1)').bind('first-guard'),
+    db.prepare('INSERT INTO settings(key,value) VALUES (?,?)').bind('guard-rollback-test','must-not-persist'),
+    db.prepare('INSERT INTO incentive_write_guards(id,allowed) VALUES (?,0)').bind('invalid-guard'),
+  ]), /valid_activity_write/);
+  assert.equal(await query("SELECT key FROM settings WHERE key='guard-rollback-test'"),null);
+  assert.equal((await query('SELECT count(*) AS n FROM incentive_write_guards')).n,0);
+  console.log('PASS real D1 guard constraints roll back every write in a failed management batch');
+  for(const [id,sid,name] of [['nickname-a','2030040001','测试甲'],['nickname-b','2030040002','测试乙']]){
+    await db.prepare('INSERT INTO class_roster(student_id,name,enabled) VALUES (?,?,1)').bind(sid,name).run();
+    await db.prepare("INSERT INTO student_accounts(id,student_id,password_hash,status,role,created_at,updated_at) VALUES (?,?,?,'active','student','fixture','fixture')").bind(id,sid,'fixture').run();
+  }
+  const nicknameCall=(id,nickname)=>mf.dispatchFetch('https://yi68.test/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname})});
+  const duplicates=await Promise.all([nicknameCall('nickname-a','共同昵称'),nicknameCall('nickname-b','共同昵称')]);
+  assert.deepEqual(duplicates.map(r=>r.status).sort(),[200,409]);
+  assert.equal((await nicknameCall('nickname-b','测试甲')).status,409);
+  assert.equal((await nicknameCall('nickname-a','👨‍👩‍👧‍👦'.repeat(12))).status,200);
+  assert.equal((await nicknameCall('nickname-a','👨‍👩‍👧‍👦'.repeat(13))).status,400);
+  console.log('PASS real D1 concurrently reserves nicknames and real names; Worker grapheme validation accepts twelve family emojis and rejects thirteen');
   const bytes = new Uint8Array(10 * 1024 * 1024);
   for (let i = 0; i < bytes.length; i++) bytes[i] = i % 251;
   let response = await mf.dispatchFetch('https://yi68.test/large-file', { method: 'POST', body: bytes });
@@ -97,3 +121,4 @@ try {
   if (mf) await mf.dispose();
   rmSync(dir, { recursive: true, force: true });
 }
+

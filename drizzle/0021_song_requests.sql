@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS song_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id TEXT NOT NULL UNIQUE,
+  song TEXT NOT NULL CHECK(length(song) BETWEEN 1 AND 160),
+  submitted_at TEXT NOT NULL
+);

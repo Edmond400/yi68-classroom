@@ -1,0 +1,16 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {api} from '@/lib/client';
+import {selectRehearsal} from '@/lib/rehearsal/session';
+import {AdministratorAccess} from '../administrator-forms';
+import {RehearsalAdmin} from './admin';
+export function RehearsalManagement({configured}:{configured:boolean}){
+ const [ready,setReady]=useState(false),[authenticated,setAuthenticated]=useState(false),[projects,setProjects]=useState<any[]>([]),[selected,setSelected]=useState(''),[title,setTitle]=useState(''),[code,setCode]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ async function load(){try{const d=await api('/api/admin/rehearsal/projects');setProjects(d.projects);setAuthenticated(true);setError('')}catch(e){setError((e as Error).message);setAuthenticated(false)}finally{setReady(true)}}
+ useEffect(()=>{void load()},[]);
+ async function manage(body:any){setBusy(true);setError('');try{const d=await api('/api/admin/rehearsal/projects',body);setProjects(d.projects);setCode('');setTitle('')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ if(!ready)return <p>正在读取汇报管理…</p>;
+ if(!authenticated)return <section className="panel rh-pad"><h1>模拟汇报管理</h1><AdministratorAccess configured={configured} onLogin={()=>void load()}/>{error&&<p role="alert">{error}</p>}</section>;
+ if(selected)return <RehearsalAdmin key={selected} configured={configured} onBack={()=>{setSelected('');void load()}}/>;
+ return <div className="rh-root"><div className="page-heading"><h1>汇报管理</h1><a className="text-link" href="/rehearsal">打开模拟汇报平台 ↗</a></div>{error&&<p className="callout error" role="alert">{error}</p>}<form className="panel rh-pad" onSubmit={e=>{e.preventDefault();void manage({action:'create',title,code})}}><h2>新建汇报</h2><div className="rh-grid"><label>汇报名称<input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>小组四位密码<input required type="password" inputMode="numeric" pattern="[0-9]{4}" minLength={4} maxLength={4} autoComplete="new-password" value={code} onChange={e=>setCode(e.target.value)}/></label></div><button className="btn" disabled={busy}>新建汇报</button></form><div className="panel incentive-list">{projects.map(p=><article key={p.id}><h2>{p.title}</h2><p className="small muted">{p.deleted_at?'已下架':p.status==='draft'?'材料准备中':p.status==='ended'?'已结束':'已发布'} · {p.has_password?'已设置密码':'请先设置四位密码'} · {new Date(p.updated_at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}</p><div className="form-actions"><button className="btn secondary" disabled={busy||!!p.deleted_at} onClick={()=>{selectRehearsal(p.id);setSelected(p.id)}}>编排汇报</button><button disabled={busy} className="text-link" onClick={()=>{const value=prompt('设置新的四位数字密码。原访问凭证会失效。');if(value!==null){if(!/^\d{4}$/.test(value)){setError('请填写四位数字，开头可以是0。');return}void manage({action:'password',id:p.id,code:value,expected_version:p.revision})}}}>{p.has_password?'重置密码':'设置密码'}</button><button className="text-link" disabled={busy} onClick={()=>{if(confirm(p.deleted_at?'恢复此汇报？':'下架此汇报？材料与录音保留，管理员可恢复。'))void manage({action:p.deleted_at?'restore':'delete',id:p.id,expected_version:p.revision})}}>{p.deleted_at?'恢复汇报':'删除汇报'}</button></div></article>)}{!projects.length&&<p className="incentive-empty">先创建一份汇报，再由小组完善材料。</p>}</div></div>;
+}

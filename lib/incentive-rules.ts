@@ -12,7 +12,7 @@ export function awardMonthFor(occurred:string,approved:string,first='2026-10'){
  const threshold=Math.max(Date.parse(occurred),Date.parse(approved));let month=beijingDay(threshold).slice(0,7);if(month<first)month=first;
  return threshold>=Date.parse(monthEnd(month))?nextMonth(month):month;
 }
-export type RankedMember={student_id:string;name:string;count:number};
+export type RankedMember={student_id:string;name:string;nickname?:string|null;count:number};
 export function selectReward(members:RankedMember[],quota:number,random:(n:number)=>number=n=>randomInt(n)){
  const sorted=members.filter(m=>m.count>0).sort((a,b)=>b.count-a.count||a.student_id.localeCompare(b.student_id));
  const winners:RankedMember[]=[],candidates:RankedMember[]=[],drawn:RankedMember[]=[];
@@ -20,7 +20,4 @@ export function selectReward(members:RankedMember[],quota:number,random:(n:numbe
   if(group.length<=slots)winners.push(...group);else{candidates.push(...group);const pool=[...group];for(let n=0;n<slots;n++){const k=random(pool.length);if(!Number.isInteger(k)||k<0||k>=pool.length)throw new Error('Invalid random choice');const [member]=pool.splice(k,1);winners.push(member);drawn.push(member);}break;}i=j;
  }
  return {winners,candidates,drawn};
-}
-export function onMonthlyBreak(studentId:string,month:string,past:RewardPeriod[]){
- return [previousMonth(month),previousMonth(previousMonth(month))].every(m=>{const p=past.find(p=>p.id==='month-'+m&&p.result_json);if(!p)return false;return JSON.parse(p.result_json!).winners.some((w:{student_id:string})=>w.student_id===studentId)});
 }

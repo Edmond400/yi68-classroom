@@ -7,7 +7,7 @@ import { digest, randomToken } from './passwords';
 
 export const SESSION_COOKIE = '__Host-yi68_session';
 export const SESSION_SECONDS = 7 * 86400;
-export type Student = { id: string; student_id: string; name: string; role: string };
+export type Student = { id: string; student_id: string; name: string; role: string; activity_admin?:boolean };
 export type AccountRecord = { student_id: string; name: string; enabled: number; id: string | null; status: string | null; role: string | null; created_at: string | null };
 export const accountName = z.string().trim().min(2, '请填写名册中的完整姓名。').max(50);
 export const studentId = z.string().trim().regex(/^\d{10}$/, '请填写10位学号。');
@@ -30,9 +30,15 @@ function cookieToken(cookie: string) {
   const value = cookie.split(';').map(v => v.trim()).find(v => v.startsWith(SESSION_COOKIE + '='))?.slice(SESSION_COOKIE.length + 1);
   return value && /^[a-f0-9]{64}$/.test(value) ? value : null;
 }
+function sessionToken(requestHeaders: Headers) {
+  const authorization = requestHeaders.get('authorization');
+  // Explicit bearer credentials take precedence; never fall back to another
+  // person's cookie when an invalid bearer token was supplied.
+  if (authorization !== null) return /^Bearer ([a-f0-9]{64})$/i.exec(authorization)?.[1] || null;
+  return cookieToken(requestHeaders.get('cookie') || '');
+}
 export async function getStudent(request?: Request): Promise<Student | null> {
-  const cookie = request ? request.headers.get('cookie') : (await headers()).get('cookie');
-  const token = cookieToken(cookie || '');
+  const token = sessionToken(request ? request.headers : await headers());
   if (!token) return null;
   return database().prepare("SELECT a.id,a.student_id,a.role,r.name FROM student_sessions s JOIN student_accounts a ON a.id=s.account_id JOIN class_roster r ON r.student_id=a.student_id WHERE s.token_hash=? AND s.expires_at>? AND a.status='active' AND r.enabled=1").bind(digest(token), Date.now()).first<Student>();
 }
@@ -56,15 +62,15 @@ function withCookie(response: Response, token: string, maxAge: number) {
   return response;
 }
 export const signedOut = () => withCookie(json({ ok: true }), '', 0);
-export async function signIn(accountId: string, expectedHash: string) {
+export async function signIn(accountId: string, expectedHash: string, bearer = false) {
   const token = randomToken(), db = database(), now = Date.now();
   const result = await db.prepare("INSERT INTO student_sessions (token_hash,account_id,expires_at) SELECT ?,a.id,? FROM student_accounts a JOIN class_roster r ON r.student_id=a.student_id WHERE a.id=? AND a.password_hash=? AND a.status='active' AND r.enabled=1").bind(digest(token), now + SESSION_SECONDS * 1000, accountId, expectedHash).run();
   if (!result.meta.changes) throw new HttpError(401, '账号状态已更新，请重新登录。');
   await db.prepare('DELETE FROM student_sessions WHERE expires_at<?').bind(now).run();
-  return withCookie(json({ ok: true }), token, SESSION_SECONDS);
+  return withCookie(json({ ok: true, ...(bearer ? { session_token: token } : {}) }), token, SESSION_SECONDS);
 }
 export async function signOut(request: Request) {
-  const token = cookieToken(request.headers.get('cookie') || '');
+  const token = sessionToken(request.headers);
   if (token) await database().prepare('DELETE FROM student_sessions WHERE token_hash=?').bind(digest(token)).run();
   return signedOut();
 }

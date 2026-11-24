@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/components/albums.css";
 import { SiteShell } from '@/components/site-shell';
 import { Toaster } from '@/components/ui/sonner';
 

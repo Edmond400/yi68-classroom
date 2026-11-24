@@ -12,13 +12,22 @@
     "enabled": true
   },
   "vars": {
-    "LOCAL_AUTH_ONLY": "true"
+    "LOCAL_AUTH_ONLY": "true",
+    "ATTACHMENT_WRITES": "r2",
+    "FAVORITE_CHARACTER_OBJECT_WRITES": "on"
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "yi68-classroom",
+      "database_id": "00000000-0000-4000-8000-000000000002",
       "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FAVORITE_CHARACTER_MEDIA",
+      "bucket_name": "yi68-character-survey-media"
     }
   ],
   "triggers": {

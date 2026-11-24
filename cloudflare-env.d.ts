@@ -1,7 +1,9 @@
 declare namespace Cloudflare {
   interface Env {
     DB?: D1Database;
-    // Supplied only by the independent Node runtime; Cloudflare uses D1 chunks.
+    FAVORITE_CHARACTER_MEDIA?: R2Bucket;
+    ATTACHMENT_WRITES?: string;
+    // Supplied only by the independent Node runtime; Cloudflare uses private R2.
     LOCAL_ATTACHMENTS?: {
       put(key: string, value: Uint8Array): Promise<void>;
       get(key: string): Promise<{ body: Uint8Array } | null>;

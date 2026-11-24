@@ -1,0 +1,9 @@
+import { redirect } from 'next/navigation';
+import { listClasses,recentPhotos } from '@/lib/albums';
+export const dynamic='force-dynamic';
+export const metadata={title:'公共相册'};
+export default async function AlbumsPage({searchParams}:{searchParams:Promise<{page?:string;classes_page?:string;semester?:string}>}){
+ const q=await searchParams;if(q.semester)redirect('/albums/classes/yi68?semester='+encodeURIComponent(q.semester));const page=Math.max(0,Math.floor(Number(q.page)||0)),cp=Math.max(0,Math.floor(Number(q.classes_page)||0));
+ let spaces,photos;try{[spaces,photos]=await Promise.all([listClasses(false,cp*60),recentPhotos(page*24)])}catch{return <p className="callout">相册暂时无法加载，请稍后刷新。</p>}
+ return <><div className="page-heading"><div><p className="eyebrow">TOGETHER / MOMENTS</p><h1>公共相册</h1><p>把每一次相聚，留在我们的日常里。无需登录，即可在活动相册分享照片、留下评论。</p></div></div><section><h2>班级目录</h2><div className="album-class-grid">{spaces.slice(0,60).map(c=><a className="panel album-space-card" key={c.id} href={'/albums/classes/'+c.id}><h3>{c.name}</h3><p>{c.description}</p><span>{c.album_count} 个活动相册</span></a>)}</div>{cp>0&&<a className="btn" href={'/albums?classes_page='+(cp-1)}>上一页班级</a>}{spaces.length>60&&<a className="btn" href={'/albums?classes_page='+(cp+1)}>更多班级</a>}</section><section><h2>最近照片</h2>{photos.length?<div className="album-photo-grid">{photos.slice(0,24).map(p=><a key={p.id} className="album-photo" href={'/albums/'+p.album_id+'?photo='+p.id}><img src={'/api/albums/photos/'+p.id+'?preview=1'} width={p.width} height={p.height} loading="lazy" alt={p.class_name+' · '+p.title}/><span>{p.class_name} · {p.title}</span></a>)}</div>:<p>新的公开照片将在这里展示，也可以进入班级查看已有相册。</p>}{page>0&&<a className="btn" href={'/albums?page='+(page-1)}>上一页照片</a>}{photos.length>24&&<a className="btn" href={'/albums?page='+(page+1)}>更多照片</a>}</section><p>请尊重肖像权、隐私与版权。需要撤回内容可在照片详情举报，或<a href="/feedback">联系管理员</a>。</p></>;
+}

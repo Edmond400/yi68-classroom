@@ -15,7 +15,7 @@ for(const f of readdirSync(resolve(root,'drizzle')).filter(f=>f.endsWith('.sql')
 function prepared(sql,params=[]){return {bind(...values){return prepared(sql,values)},async first(){return sqlite.prepare(sql).get(...params)||null},async all(){return {results:sqlite.prepare(sql).all(...params),meta:{changes:Number(sqlite.prepare('SELECT changes() AS n').get().n)}}},async run(){const r=sqlite.prepare(sql).run(...params);return {success:true,meta:{changes:Number(r.changes)}}}}}
 const db={prepare:prepared,async batch(statements){sqlite.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.all());sqlite.exec('COMMIT');return results}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 // Cloudflare test environment deliberately has no object storage binding.
-globalThis.__yi68Env={DB:db,ADMIN_EMAIL:'owner@example.test'};
+globalThis.__yi68Env={DB:db,ATTACHMENT_WRITES:'d1',ADMIN_EMAIL:'owner@example.test'};
 globalThis.__yi68Actor=null;
 globalThis.__yi68Cookie='';
 globalThis.__yi68Env.CLASS_ROSTER_JSON=JSON.stringify([{name:'测试同学',student_id:'2030010001'},{name:'测试班长',student_id:'2030010002'}]);
@@ -61,12 +61,12 @@ const event={id:'private-event',item_id:draft.id,title:'测试节点',type:'dead
 assert.equal((await postAdmin({entity:'event',value:event})).status,200);
 let pub=await app.data.getPublicData();assert(!pub.items.some(i=>i.id===draft.id));assert(!pub.progress.some(p=>p.item_id===draft.id));assert(!pub.events.some(e=>e.item_id===draft.id));check('draft items and their logs and calendar entries stay private');
 let form=new FormData();form.append('item_id',draft.id);form.append('file',new File([new Uint8Array([137,80,78,71,13,10,26,10])],'test.png',{type:'image/png'}));
-let uploaded=await app.upload.POST(new Request('https://yi68.test/api/upload',{method:'POST',headers:{Origin:'https://yi68.test'},body:form}));assert.equal(uploaded.status,200);let assetId=(await uploaded.json()).id;
-globalThis.__yi68Cookie='';assert.equal((await app.assets.GET(new Request('https://yi68.test/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,404);
-globalThis.__yi68Cookie=adminCookie;assert.equal((await app.assets.GET(new Request('https://yi68.test/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,200);check('draft attachments are readable only by the owner');
+let uploaded=await app.upload.POST(new Request('https://yi68.test/api/upload',{method:'POST',headers:{Origin:'https://yi68.test',Cookie:globalThis.__yi68Cookie},body:form}));assert.equal(uploaded.status,200);let assetId=(await uploaded.json()).id;
+globalThis.__yi68Cookie='';assert.equal((await app.assets.GET(getReq('/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,404);
+globalThis.__yi68Cookie=adminCookie;assert.equal((await app.assets.GET(getReq('/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,200);check('draft attachments are readable only by the owner');
 assert.equal((await postAdmin({entity:'item',value:{...draft,published:true}})).status,200);
 pub=await app.data.getPublicData();assert(pub.events.some(e=>e.item_id===draft.id));assert(pub.progress.some(p=>p.item_id===draft.id));assert(pub.assets.some(a=>a.id===assetId));
-globalThis.__yi68Cookie='';assert.equal((await app.assets.GET(new Request('https://yi68.test/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,200);check('publishing synchronizes related content and attachment visibility');
+globalThis.__yi68Cookie='';assert.equal((await app.assets.GET(getReq('/api/assets/'+assetId),{params:Promise.resolve({id:assetId})})).status,200);check('publishing synchronizes related content and attachment visibility');
 globalThis.__yi68Cookie=adminCookie;await postAdmin({entity:'item',value:{...draft,published:true,data:{...draft.data,summary:'方案已更新'}}});assert.equal(sqlite.prepare('SELECT summary FROM progress WHERE id=?').get(log.id).summary,log.summary);check('editing a plan preserves the historical daily progress text');
 
 globalThis.__yi68Cookie='';
@@ -117,14 +117,19 @@ try{
  const imported=new DatabaseSync(resolve(target,'yi68.sqlite'));assert.equal(imported.prepare('SELECT COUNT(*) AS n FROM birthday_responses').get().n,28);assert.equal(imported.prepare('SELECT COUNT(*) AS n FROM administrator').get().n,1);assert.equal(imported.prepare('SELECT COUNT(*) AS n FROM administrator_sessions').get().n,0);assert.equal(imported.prepare('SELECT summary FROM progress WHERE id=?').get(log.id).summary,log.summary);assert.deepEqual(new Uint8Array(readFileSync(resolve(target,'attachments',assetId))),new Uint8Array([137,80,78,71,13,10,26,10]));imported.close();
  const repeated=spawnSync(process.execPath,['scripts/import-backup.mjs',backupPath],{cwd:root,env:{...process.env,YI68_DATA_DIR:target},encoding:'utf8'});assert.notEqual(repeated.status,0);
  const legacy={...migrated,format:'yi68-backup-v1',data:{...migrated.data}};delete legacy.data.administrator;delete legacy.data.birthday_responses;writeFileSync(backupPath,JSON.stringify(legacy));const legacyTarget=resolve(temporary,'legacy-data');const oldResult=spawnSync(process.execPath,['scripts/import-backup.mjs',backupPath],{cwd:root,env:{...process.env,YI68_DATA_DIR:legacyTarget},encoding:'utf8'});assert.equal(oldResult.status,0,oldResult.stderr);
- check('full backup restores questionnaire, administrator, history and attachment bytes into a new database; v1 import remains supported');
+ const manifestResponse=await app.backup.GET(getReq('/api/admin/backup?mode=manifest'));
+ const manifest=await manifestResponse.json();assert.equal(manifest.files_mode,'external');assert.equal(manifest.files.length,0);assert.equal(manifest.manifest.length,1);
+ writeFileSync(backupPath,JSON.stringify(manifest));const externalTarget=resolve(temporary,'external-data');
+ const externalRestore=spawnSync(process.execPath,['scripts/import-backup.mjs',backupPath,resolve(target,'attachments')],{cwd:root,env:{...process.env,YI68_DATA_DIR:externalTarget},encoding:'utf8'});assert.equal(externalRestore.status,0,externalRestore.stderr);
+ assert.deepEqual(readFileSync(resolve(externalTarget,'attachments',assetId)),readFileSync(resolve(target,'attachments',assetId)));
+ check('full and manifest backups restore attachment bytes and records into empty databases; historical backups remain supported');
 }finally{rmSync(temporary,{recursive:true,force:true})}
 globalThis.__yi68Cookie='';
-assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://yi68.test'}}),{params:Promise.resolve({id:assetId})})).status,403);
+assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://yi68.test',Cookie:globalThis.__yi68Cookie}}),{params:Promise.resolve({id:assetId})})).status,403);
 assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM asset_chunks WHERE asset_id=?').get(assetId).n,1);
 globalThis.__yi68Cookie=adminCookie;
-assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://evil.test'}}),{params:Promise.resolve({id:assetId})})).status,403);
-assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://yi68.test'}}),{params:Promise.resolve({id:assetId})})).status,200);
+assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://evil.test',Cookie:globalThis.__yi68Cookie}}),{params:Promise.resolve({id:assetId})})).status,403);
+assert.equal((await app.assets.DELETE(new Request('https://yi68.test/api/assets/'+assetId,{method:'DELETE',headers:{Origin:'https://yi68.test',Cookie:globalThis.__yi68Cookie}}),{params:Promise.resolve({id:assetId})})).status,200);
 assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM asset_chunks WHERE asset_id=?').get(assetId).n,0);
 assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM assets WHERE id=?').get(assetId).n,0);
 check('D1 attachment deletion requires same-origin administrator access and removes all stored chunks');
@@ -145,3 +150,4 @@ for(let i=0;i<30;i++)await auth({action:'login',username:'admin',password:'wrong
 assert.equal((await auth({action:'login',username:'admin',password:'wrong-password'})).status,429);
 check('administrator brute-force attempts are limited');
 console.log(passed+' meaningful security and persistence checks passed.');sqlite.close();
+
