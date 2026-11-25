@@ -1,25 +1,27 @@
 {
   "name": "yi68-classroom",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm check && node tests/security.test.mjs && node tests/color-homework.test.mjs && node tests/sketch-homework.test.mjs && node tests/r2-attachments.test.mjs && node tests/public-albums.test.mjs && node tests/album-export.test.mjs && node tests/drink-orders.test.mjs && node tests/talent-survey.test.mjs && node tests/song-requests.test.mjs && node scripts/prepare-rehearsal-assets.mjs && vite build",
+    "build": "pnpm check && node tests/site-operations.test.mjs && node tests/security.test.mjs && node tests/color-homework.test.mjs && node tests/sketch-homework.test.mjs && node tests/r2-attachments.test.mjs && node tests/public-albums.test.mjs && node tests/album-export.test.mjs && node tests/drink-orders.test.mjs && node tests/talent-survey.test.mjs && node tests/song-requests.test.mjs && node scripts/prepare-rehearsal-assets.mjs && vite build",
     "start": "wrangler dev --local",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "build:server": "YI68_NODE_BUILD=1 NEXT_TELEMETRY_DISABLED=1 next build --webpack",
     "start:server": "YI68_NODE_BUILD=1 next start",
-    "deploy": "node scripts/predeploy-storage.mjs && node scripts/predeploy-drinks.mjs && node scripts/predeploy-public-albums.mjs && wrangler d1 migrations apply DB --remote && wrangler deploy && node scripts/public-albums-production-smoke.mjs && node scripts/drinks-production-smoke.mjs && node scripts/talent-production-smoke.mjs && node scripts/song-production-smoke.mjs && node scripts/color-homework-production-smoke.mjs && node scripts/sketch-homework-production-smoke.mjs",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "test": "node tests/security.test.mjs && node tests/node-runtime.test.mjs && node tests/d1-attachments.test.mjs && node tests/r2-attachments.test.mjs && node tests/favorite-character-survey.test.mjs && node tests/incentives.test.mjs && node tests/client-network.test.mjs && node tests/activity-admins.test.mjs && node tests/nicknames-simulation.test.mjs && node tests/reward-playback.test.mjs && pnpm test:rehearsal && pnpm test:monthly-rewards",
     "check": "tsc --noEmit",
     "test:rehearsal": "node scripts/prepare-rehearsal-assets.mjs && node tests/rehearsal-algorithm.test.mjs && node tests/rehearsal-migration.test.mjs && node tests/rehearsal-d1.test.mjs && node tests/rehearsal-multi.test.mjs && node tests/rehearsal-pptx.test.mjs && node tests/rehearsal-reading-pdf.test.mjs && node tests/rehearsal-editing.test.mjs && node tests/rehearsal-slide-cache.test.mjs && node tests/rehearsal-audio.test.mjs",
-    "test:monthly-rewards": "node tests/monthly-reward-d1.test.mjs"
+    "test:monthly-rewards": "node tests/monthly-reward-d1.test.mjs",
+    "test:site-operations": "node tests/site-operations.test.mjs",
+    "accept:site-operations": "node scripts/site-operations-production-smoke.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -1,3 +1,5 @@
+import {monitoredBucket} from './storage-telemetry';
+import {emitEvent} from './site-telemetry';
 import { env } from 'cloudflare:workers';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -13,7 +15,7 @@ const photoColumns='id,album_id,filename,mime,size,width,height,position,created
 const albumColumns=`a.*, (SELECT COUNT(*) FROM class_album_photos p WHERE p.album_id=a.id AND p.hidden=0) AS photo_count,
  COALESCE((SELECT p.id FROM class_album_photos p WHERE p.id=a.cover_photo_id AND p.album_id=a.id AND p.hidden=0),
  (SELECT p.id FROM class_album_photos p WHERE p.album_id=a.id AND p.hidden=0 ORDER BY p.position,p.created_at,p.id LIMIT 1)) AS cover_id`;
-function bucket(){if(!env.FAVORITE_CHARACTER_MEDIA)throw new HttpError(503,'照片存储暂时不可用。');return env.FAVORITE_CHARACTER_MEDIA}
+function bucket(){if(!env.FAVORITE_CHARACTER_MEDIA)throw new HttpError(503,'照片存储暂时不可用。');return monitoredBucket(env.FAVORITE_CHARACTER_MEDIA)}
 const hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
 const idSchema=z.string().uuid();
 const infoSchema=z.object({title:z.string().trim().min(1).max(120),activity_date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(d=>{const date=new Date(d+'T00:00:00Z');return Number.isFinite(+date)&&date.toISOString().slice(0,10)===d}),description:z.string().trim().max(4000).default('')});
@@ -105,6 +107,7 @@ export async function uploadAlbumPhoto(request:Request,albumId:string,anonymous=
   const result=await db.prepare(`INSERT INTO class_album_photos (id,album_id,filename,mime,size,checksum,object_key,thumbnail_key,thumbnail_size,width,height,position,created_at,uploaded_by,uploaded_by_name,submission_hash)
    SELECT ?,id,?,?,?,?,?,?,?,?,?,COALESCE((SELECT MAX(position)+1 FROM class_album_photos WHERE album_id=?),0),?,?,?,? FROM class_albums WHERE id=? AND published=? AND (?=0 OR (uploads_open=1 AND archived=0 AND EXISTS(SELECT 1 FROM album_classes c WHERE c.id=class_albums.class_id AND c.status='active')))`).bind(id,filename,file.type,full.length,checksum,key,thumbKey,thumb.length,width,height,albumId,now,null,name,submissionHash,albumId,Number(anonymous),Number(anonymous)).run();
   if(!result.meta.changes)throw new HttpError(409,'相册发布状态已变化或相册被删除，请刷新后重试。');
+  void emitEvent({id:'album-upload:'+id,event_name:'upload_success',module_id:'albums',file_count:2,bytes:full.length+thumb.length});
  }catch(error){
   // A failed response can follow a committed insert; never delete referenced bytes.
   let committed;try{committed=await db.prepare('SELECT id FROM class_album_photos WHERE id=?').bind(id).first()}catch{throw error}
@@ -130,7 +133,7 @@ async function commentPost(request:Request,photoId:string,admin=false){
  const submissionHash=hash(new TextEncoder().encode(p.submission_key)),existing=await db.prepare('SELECT photo_id,submission_hash FROM class_album_comments WHERE id=?').bind(p.id).first<any>();if(existing){if(existing.photo_id!==photoId||existing.submission_hash!==submissionHash)throw new HttpError(409,'提交标识冲突。');return {ok:true,id:p.id}}
  await rateLimit(request,'public-album-comment',8,60);const name=await signature(p.author_name);
  const result=await db.prepare(`INSERT INTO class_album_comments(id,photo_id,account_id,author_name,content,created_at,submission_hash) SELECT ?,p.id,NULL,?,?,?,? FROM class_album_photos p JOIN class_albums a ON a.id=p.album_id JOIN album_classes c ON c.id=a.class_id WHERE p.id=? AND ${visibleAlbum} AND a.comments_open=1 AND p.hidden=0`).bind(p.id,name,p.content,new Date().toISOString(),submissionHash,photoId).run();
- if(!result.meta.changes)throw new HttpError(409,'照片或评论状态已变化，请刷新。');return {ok:true,id:p.id};
+ if(!result.meta.changes)throw new HttpError(409,'照片或评论状态已变化，请刷新。');void emitEvent({id:'album-comment:'+p.id,event_name:'comment_created',module_id:'albums'});return {ok:true,id:p.id};
 }
 export async function albumStudentPost(request:Request,path:string[]){try{
  if(path.length===2&&path[1]==='photos')return json(await uploadAlbumPhoto(request,path[0],true));

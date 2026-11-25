@@ -1,3 +1,4 @@
+import {emitEvent} from './site-telemetry';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { ATTACHMENT_CHUNK_BYTES } from './attachment-storage';
@@ -67,7 +68,7 @@ export async function recordFavoriteCharacterResponse(answer: z.infer<typeof fav
   writes.push(db.prepare('SELECT payload_hash FROM favorite_character_responses WHERE request_key=?').bind(key));
   const result = await db.batch<{ payload_hash: string }>(writes);
   const stored = result.at(-1)?.results[0];
-  if (stored?.payload_hash === payload) return;
+  if (stored?.payload_hash === payload) {if(result[0].meta.changes)void emitEvent({id:'character-upload:'+key,event_name:'upload_success',module_id:'character',file_count:1,bytes:bytes.length});return;}
   if (stored) throw new HttpError(409, '刚才那份已经提交。本次填写内容已保留，请重新选择图片后再提交。');
   if (!(await readFavoriteCharacterSurvey()).open) throw new HttpError(409, '当前未开放收集。');
   throw new HttpError(409, '可接收的答卷或图片容量已达上限，请联系班长。');
@@ -114,7 +115,7 @@ export async function recordFavoriteCharacterObject(answer: z.infer<typeof favor
     }
   })();
   if (stored?.id !== id) await discardUnreferenced();
-  if (stored?.payload_hash === payload) return;
+  if (stored?.payload_hash === payload) {if(stored.id===id)void emitEvent({id:'character-upload:'+key,event_name:'upload_success',module_id:'character',file_count:1,bytes:image.size});return;}
   if (stored) throw new HttpError(409, '刚才那份已经提交。本次填写内容已保留，请重新选择图片后再提交。');
   if (!(await readFavoriteCharacterSurvey()).open) throw new HttpError(409, '当前未开放收集。');
   throw new HttpError(409, '可接收的答卷数量已达上限，或同一份已经提交。');

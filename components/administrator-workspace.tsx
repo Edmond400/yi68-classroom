@@ -15,7 +15,11 @@ import { TalentSurveyAdmin } from './talent-survey-admin';
 import { SongRequestAdmin } from './song-request-admin';
 import { SketchHomeworkAdmin } from './sketch-homework';
 import { ColorHomeworkAdmin } from './color-homework';
+import {HomeConfigAdmin} from './home-config-admin';
+import {SiteAnalytics} from './site-analytics';
 const pages = {
+ homeConfig:{title:'首页管理',Content:HomeConfigAdmin},
+ analytics:{title:'站点监测',Content:SiteAnalytics},
  sketchHomework: { title: '素描作业上交登记', Content: SketchHomeworkAdmin },
  homework: { title: '色彩作业上交登记', Content: ColorHomeworkAdmin },
  songs: { title: '现场点歌管理', Content: SongRequestAdmin },

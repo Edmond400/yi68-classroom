@@ -17,7 +17,7 @@ await build({stdin:{contents:`export * from './lib/talent-survey';export {GET as
 try{
  const app=await import(pathToFileURL(out).href);
  const post=(name,program,headers={Origin:origin})=>app.studentPost(new Request(origin+app.talentPath,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'Mobile MicroMessenger/8.0',...headers},body:new URLSearchParams({name,program})}));
- let html=await(await app.studentGet(new Request(origin+app.talentPath))).text();assert.equal((html.match(/<input /g)||[]).length,2);assert(!html.includes('<script'));assert.match(html,/required/g);
+ let html=await(await app.studentGet(new Request(origin+app.talentPath))).text();assert.equal((html.match(/<input /g)||[]).length,2);assert(!html.replace('<script defer src="/telemetry.js"></script>','').includes('<script'));assert.match(html,/required/g);
  assert.equal((await post(' 同学甲 ','钢琴')).status,303);assert.equal((await post('同学甲','朗诵')).status,303);assert.equal((await post('同学乙','合唱')).status,303);
  let rows=await app.talentRegistrations();assert.equal(rows.length,2);assert.equal(rows.find(r=>r.name==='同学甲').program,'朗诵');
  assert.equal((await post('','节目')).status,400);assert.equal((await post('姓名','  ')).status,400);assert.equal((await post('字'.repeat(41),'节目')).status,400);assert.equal((await post('姓名','字'.repeat(161))).status,400);

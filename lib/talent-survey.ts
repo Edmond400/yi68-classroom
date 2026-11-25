@@ -1,3 +1,4 @@
+import {emitEvent} from './site-telemetry';
 import { z } from 'zod';
 import { database } from './data';
 
@@ -13,6 +14,7 @@ export async function saveTalentRegistration(answer: z.infer<typeof talentInput>
   await database().prepare(`INSERT INTO talent_registrations(name,program,submitted_at) VALUES (?,?,?)
     ON CONFLICT(name) DO UPDATE SET program=excluded.program,submitted_at=excluded.submitted_at`)
     .bind(answer.name, answer.program, new Date().toISOString()).run();
+  void emitEvent({event_name:'form_submit_success',module_id:'talent'});
 }
 export async function talentRegistrations() {
   return (await database().prepare('SELECT name,program,submitted_at FROM talent_registrations ORDER BY submitted_at DESC,name').all<TalentRegistration>()).results;

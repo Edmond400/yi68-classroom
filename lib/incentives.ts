@@ -1,3 +1,4 @@
+import {emitAudit} from './site-telemetry';
 import { z } from 'zod';
 import { database } from './data';
 import { digest } from './passwords';
@@ -20,7 +21,7 @@ export async function ensurePeriods(now=new Date()){
  if(!ids.has(c.semester_id))ops.push(db.prepare('INSERT OR IGNORE INTO incentive_periods(id,kind,label,starts_at,ends_at,quota) VALUES (?,?,?,?,?,10)').bind(c.semester_id,'semester',c.semester_label,c.semester_start,c.semester_end));
  if(ops.length)await db.batch(ops);return c;
 }
-export async function audit(actor:string,action:string,target:string,before:unknown,after:unknown){await database().prepare('INSERT INTO incentive_audit VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,action,target,JSON.stringify(before??null),JSON.stringify(after??null),new Date().toISOString()).run()}
+export async function audit(actor:string,action:string,target:string,before:unknown,after:unknown){void emitAudit(action,'participation',true,'activity_management',actor);await database().prepare('INSERT INTO incentive_audit VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,action,target,JSON.stringify(before??null),JSON.stringify(after??null),new Date().toISOString()).run()}
 export async function members(){return (await database().prepare('SELECT r.student_id,r.name,r.enabled,COALESCE(m.is_committee,0) AS is_committee,a.id AS account_id,a.status AS account_status FROM class_roster r LEFT JOIN incentive_members m ON m.student_id=r.student_id LEFT JOIN student_accounts a ON a.student_id=r.student_id ORDER BY r.student_id').all<any>()).results}
 export async function records(student_id?:string){return (await database().prepare(`SELECT p.*,r.name,a.task_id,a.occurred_at,a.content,a.state AS activity_state,t.title AS task_title,t.kind,c.participation_id AS counted,c.award_month,c.day FROM incentive_participations p JOIN class_roster r ON r.student_id=p.student_id JOIN incentive_activities a ON a.id=p.activity_id JOIN incentive_tasks t ON t.id=a.task_id LEFT JOIN incentive_counts c ON c.participation_id=p.id ${student_id?'WHERE p.student_id=?':''} ORDER BY a.occurred_at DESC,p.id`).bind(...(student_id?[student_id]:[])).all<any>()).results}
 export function recordReason(r:any){if(r.status!=='approved'||r.activity_state!=='active')return '已作废，不计奖';if(r.duty)return '本职组织活动，保留记录、不计奖';if(!r.counted)return r.kind==='public_account'?'该篇推文已达两次上限，或同日已计次':'同任务同日已有计次';return '已计入'+r.award_month+'期'}

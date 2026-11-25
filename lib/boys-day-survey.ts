@@ -1,3 +1,4 @@
+import {emitEvent} from './site-telemetry';
 import { z } from 'zod';
 import { database } from './data';
 import { HttpError } from './http';
@@ -35,7 +36,7 @@ export async function recordBoysDayResponse(answer: z.infer<typeof boysDayRespon
   const payload = digest(JSON.stringify([answer.name, answer.pairs, answer.introduction]));
 
   // Check the deadline in the write itself so closing the survey also stops requests in flight.
-  const [, lookup] = await db.batch<{ payload_hash: string }>([
+  const [inserted, lookup] = await db.batch<{ payload_hash: string }>([
     db.prepare(`INSERT INTO boys_day_responses (id, request_key, payload_hash, name, pairs, introduction, created_at)
       SELECT ?, ?, ?, ?, ?, ?, ?
       WHERE COALESCE((SELECT json_extract(value, '$.open') FROM settings WHERE key = ?), 1) = 1
@@ -46,6 +47,7 @@ export async function recordBoysDayResponse(answer: z.infer<typeof boysDayRespon
   const stored = lookup.results[0];
   if (!stored) throw new HttpError(409, (await readBoysDaySurvey()).copy.closedText);
   if (stored.payload_hash !== payload) throw new HttpError(409, '本次提交标识已使用，请重新填写后提交。');
+  if(inserted.meta.changes)void emitEvent({id:'boys-day:'+key,event_name:'form_submit_success',module_id:'boys_day'});
 }
 
 export async function readBoysDayResponses() {

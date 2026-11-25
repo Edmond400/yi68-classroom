@@ -1,0 +1,3 @@
+import {emitEvent} from './site-telemetry';
+// Wrap only R2 operations. No keys, filenames, headers or object contents enter logs.
+export function monitoredBucket(bucket:R2Bucket):R2Bucket{return new Proxy(bucket,{get(target,property){const value=Reflect.get(target,property);if(typeof value!=='function')return value;if(!['get','put','head','delete','list'].includes(String(property)))return value.bind(target);return async(...args:unknown[])=>{try{return await value.apply(target,args)}catch(error){void emitEvent({event_name:'system_error',success:false,error_code:'r2_'+String(property)+'_failed'});throw error}}}})}

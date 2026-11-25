@@ -24,6 +24,7 @@ try {
   const tea = { drink: '蜜桃四季春', cup: '标准', temperature: '常温', sugar: '五分糖', topping: '标准' };
   const milk = { drink: '珍珠奶茶', cup: '大杯', temperature: '热', sugar: '三分糖', milk: '换冷链鲜奶' };
   let r = await app.studentGet(); let html = await r.text();
+  assert.equal((r.headers.get('content-security-policy').match(/script-src/g)||[]).length,1);assert.match(r.headers.get('content-security-policy'),/script-src 'self' 'nonce-/);
   assert.equal(r.status, 200); assert.match(html, /开始填写/); assert(!html.includes('示例甲')); assert(!html.includes('示例旧丙')); assert(!html.includes('蜜桃四季春'));
   assert.equal(r.headers.get('referrer-policy'), 'same-origin', 'Normal browser POST must retain its same-origin Origin header');
   const compatible = new Request(origin + app.drinkPath, { method: 'POST', headers: { Referer: origin + app.drinkPath, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ name: '普通甲', action: 'identify' }) });

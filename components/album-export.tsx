@@ -58,7 +58,7 @@ export function AlbumExport({ albumId, classId, name, admin = false, disabled = 
       const chunks: Uint8Array<ArrayBuffer>[] = [], total = photos.reduce((sum, p) => sum + p.size, 0);
       let lastUpdate = 0;
       await writeAlbumZip(photos, async photo => {
-        const response = await fetch(prefix + '/photos/' + encodeURIComponent(photo.id), {
+        const response = await fetch(prefix + '/photos/' + encodeURIComponent(photo.id)+'?download=1&transfer=zip', {
           credentials: 'same-origin', cache: 'no-store', signal: abort.signal, headers: admin ? administratorHeaders() : {},
         });
         return response;

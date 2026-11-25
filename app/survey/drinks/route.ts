@@ -8,7 +8,7 @@ async function page(state: Parameters<typeof drinkOrderHtml>[2] = {}, status = 2
   const nonce = crypto.randomUUID().replace(/-/g, '');
   return new Response(drinkOrderHtml(await readDrinkSettings(), nonce, state), { status, headers: {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'nonce-${nonce}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
+    'Content-Security-Policy': `default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'nonce-${nonce}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
   } });
 }
 export async function GET() { return page(); }

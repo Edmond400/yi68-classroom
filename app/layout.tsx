@@ -19,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className="antialiased"><SiteShell>{children}</SiteShell><Toaster position="top-center" /></body>
+    <html lang="zh-CN" data-yi68-shell="react">
+      <body className="antialiased"><script src="/telemetry.js" defer/><SiteShell>{children}</SiteShell><Toaster position="top-center" /></body>
     </html>
   );
 }

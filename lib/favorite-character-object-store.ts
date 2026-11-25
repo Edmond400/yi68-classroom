@@ -1,3 +1,4 @@
+import {monitoredBucket} from './storage-telemetry';
 import { env } from 'cloudflare:workers';
 import { HttpError } from './http';
 import type { FavoriteCharacterMime } from './favorite-character-model';
@@ -11,8 +12,9 @@ export type FavoriteCharacterObjectStore = {
 const settings = () => env as typeof env & { FAVORITE_CHARACTER_MEDIA?: R2Bucket; FAVORITE_CHARACTER_OBJECT_WRITES?: string };
 
 export function getFavoriteCharacterObjectStore(): FavoriteCharacterObjectStore | null {
-  const bucket = settings().FAVORITE_CHARACTER_MEDIA;
-  if (!bucket) return null;
+  const configured = settings().FAVORITE_CHARACTER_MEDIA;
+  if (!configured) return null;
+  const bucket=monitoredBucket(configured);
   return {
     provider: 'r2',
     async put(key, image, mime) {

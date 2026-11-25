@@ -1,3 +1,4 @@
+import {monitoredBucket} from './storage-telemetry';
 import { env } from 'cloudflare:workers';
 import { createHash } from 'node:crypto';
 import { database } from './data';
@@ -17,7 +18,7 @@ function keyFor(id: string) {
 }
 function bucket() {
   if (!env.FAVORITE_CHARACTER_MEDIA) throw new HttpError(503, '附件存储暂时不可用，请稍后重试。');
-  return env.FAVORITE_CHARACTER_MEDIA;
+  return monitoredBucket(env.FAVORITE_CHARACTER_MEDIA);
 }
 async function readObject(key: string, size: number, checksum?: string | null): Promise<Uint8Array<ArrayBuffer>> {
   const object = await bucket().get(key);

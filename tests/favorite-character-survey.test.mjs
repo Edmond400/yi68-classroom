@@ -41,7 +41,7 @@ const compiled = await build({
     }};
   `, resolveDir: root, loader: 'ts' },
   absWorkingDir: root, bundle: true, write: false, platform: 'neutral', format: 'esm',
-  external: ['cloudflare:workers', 'node:crypto'],
+  external: ['cloudflare:workers', 'node:crypto','node:async_hooks'],
   plugins: [{ name: 'explicit-request-headers-only', setup(ctx) {
     ctx.onResolve({ filter: /^next\/headers$/ }, () => ({ path: 'headers', namespace: 'unused-test-next' }));
     ctx.onLoad({ filter: /.*/, namespace: 'unused-test-next' }, () => ({ contents: 'export function headers() { throw new Error("unexpected implicit request"); }' }));
@@ -96,7 +96,7 @@ try {
   assert.match(html, /enctype="multipart\/form-data"/);
   assert.match(html, /type="file"[^>]* required/);
   assert.match(html, /现场只展示图片；姓名只供班长在后台核对/);
-  assert.doesNotMatch(html, /不是自拍|<script|<input[^>]+name="character"[^>]+required/);
+  assert.doesNotMatch(html.replace('<script defer src="/telemetry.js"></script>',''), /不是自拍|<script|<input[^>]+name="character"[^>]+required/);
   const key = html.match(/name="request_key" value="([a-f0-9-]+)"/)?.[1];
   assert.ok(key);
   let res = await submit(key);

@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new Response(body, { headers: {
       'Content-Type': mime,
       'Content-Length': String(size),
-      'Content-Disposition': `inline; filename="character.${favoriteCharacterExtensions[mime]}"`,
+      'Content-Disposition': `${new URL(request.url).searchParams.get('download')==='1'?'attachment':'inline'}; filename="character.${favoriteCharacterExtensions[mime]}"`,
       'Cache-Control': 'private, no-store',
       'Cross-Origin-Resource-Policy': 'same-origin',
       'X-Content-Type-Options': 'nosniff',

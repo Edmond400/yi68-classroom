@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 const headers = {
   'Cache-Control': 'private, no-store',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   'Content-Type': 'text/html; charset=utf-8',
   'Referrer-Policy': 'same-origin',
   'X-Content-Type-Options': 'nosniff',

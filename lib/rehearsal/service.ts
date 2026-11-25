@@ -1,3 +1,4 @@
+import {emitEvent} from '../site-telemetry';
 import {database} from '../data';
 import {requireAdministrator,rateLimit} from '../administrator';
 import {HttpError,json,readBytes,sameOrigin} from '../http';
@@ -87,13 +88,13 @@ export async function submitRecording(request:Request,projectId='current'){
   const retry=await db.prepare('SELECT request_hash FROM rehearsal_recordings WHERE id=? AND project_id=?').bind(input.id,projectId).first<{request_hash:string}>();if(retry?.request_hash===requestHash)return json({ok:true,id:input.id,retried:true});
   throw new HttpError(409,'保存未完成：可能已达容量/锁定上限或项目已更新。原录音记录已保留，本次可重试。');
  }
- return json({ok:true,id:input.id});
+ void emitEvent({id:'rehearsal-upload:'+input.id,event_name:'upload_success',module_id:'rehearsal',file_count:1,bytes:bytes.length});return json({ok:true,id:input.id});
 }
 async function uploadSlide(request:Request,projectId:string){
  const p=await getProject(projectId);if(!p)throw new HttpError(409,'请先保存汇报基本信息，再上传PPT');
  const bytes=await readBytes(request,MAX_PAGE_BYTES);if(!bytes.length)throw new HttpError(400,'页面图片为空');const mime=detectMime(bytes,'slide',request.headers.get('content-type')||'');
  const file={id:crypto.randomUUID(),project_id:projectId,kind:'slide' as const,mime,bytes:bytes.length,hash:await sha256(bytes)};
- await database().batch([accessGuard(request,projectId),capacityGuard(bytes.length),...fileStatements(file,bytes)]);return json({id:file.id,mime,bytes:bytes.length});
+ await database().batch([accessGuard(request,projectId),capacityGuard(bytes.length),...fileStatements(file,bytes)]);void emitEvent({id:'rehearsal-upload:'+file.id,event_name:'upload_success',module_id:'rehearsal',file_count:1,bytes:bytes.length});return json({id:file.id,mime,bytes:bytes.length});
 }
 async function reviewRecording(request:Request,projectId:string){const i=reviewSchema.parse(await payload(request));const db=database();if(!await db.prepare("SELECT id FROM rehearsal_recordings WHERE id=? AND project_id=?").bind(i.id,projectId).first())throw new HttpError(404,'录音不存在');const statement=i.action==='delete'?db.prepare('DELETE FROM rehearsal_recordings WHERE id=? AND project_id=?').bind(i.id,projectId):db.prepare('UPDATE rehearsal_recordings SET locked=COALESCE(?,locked),complete=COALESCE(?,complete) WHERE id=? AND project_id=?').bind(i.locked===undefined?null:Number(i.locked),i.complete===undefined?null:Number(i.complete),i.id,projectId);await db.batch([accessGuard(request,projectId),statement]);return json({ok:true})}
 async function cleanup(request:Request,projectId:string){
@@ -103,7 +104,7 @@ async function cleanup(request:Request,projectId:string){
  const rows=await database().prepare('SELECT snapshot_json FROM rehearsal_recordings WHERE project_id=?').bind(projectId).all<{snapshot_json:string}>();for(const row of rows.results)remember(JSON.parse(row.snapshot_json));
  const files=await database().prepare("SELECT id FROM rehearsal_files WHERE kind IN ('slide','pptx') AND project_id=?").bind(projectId).all<{id:string}>();const remove=files.results.filter(f=>!keep.has(f.id));if(remove.length)await database().batch([accessGuard(request,projectId),guard('EXISTS(SELECT 1 FROM rehearsal_projects WHERE id=? AND revision=?)',projectId,p.revision),...remove.map(f=>database().prepare('DELETE FROM rehearsal_files WHERE id=? AND project_id=?').bind(f.id,projectId))]);return json({ok:true,removed:remove.length});
 }
-async function uploadDeck(request:Request,projectId:string){const bytes=await readBytes(request,20*1024*1024);let pages:string[];try{pages=inspectPptx(bytes)}catch(e){throw new HttpError(400,(e as Error).message)}const file={id:crypto.randomUUID(),project_id:projectId,kind:'pptx' as const,mime:'application/vnd.openxmlformats-officedocument.presentationml.presentation',bytes:bytes.length,hash:await sha256(bytes)};await database().batch([accessGuard(request,projectId),capacityGuard(bytes.length),...fileStatements(file,bytes)]);return json({id:file.id,pages,bytes:file.bytes})}
+async function uploadDeck(request:Request,projectId:string){const bytes=await readBytes(request,20*1024*1024);let pages:string[];try{pages=inspectPptx(bytes)}catch(e){throw new HttpError(400,(e as Error).message)}const file={id:crypto.randomUUID(),project_id:projectId,kind:'pptx' as const,mime:'application/vnd.openxmlformats-officedocument.presentationml.presentation',bytes:bytes.length,hash:await sha256(bytes)};await database().batch([accessGuard(request,projectId),capacityGuard(bytes.length),...fileStatements(file,bytes)]);void emitEvent({id:'rehearsal-upload:'+file.id,event_name:'upload_success',module_id:'rehearsal',file_count:1,bytes:file.bytes});return json({id:file.id,pages,bytes:file.bytes})}
 export async function handleRehearsal(request:Request,path:string[],admin=false):Promise<Response>{
  try{
   if(admin)await requireAdministrator(request);

@@ -13,8 +13,8 @@ const memoryZipLimit = 64 * 1024 * 1024;
 type FileSink = { write(bytes: Uint8Array<ArrayBuffer>): Promise<void>; close(): Promise<void>; abort(): Promise<void> };
 type SaveAs = (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{ createWritable(): Promise<FileSink> }>;
 
-async function imageResponse(id: string, signal?: AbortSignal) {
-  const response = await fetch(`${favoriteCharacterAdminApi}/image/${encodeURIComponent(id)}`, {
+async function imageResponse(id: string, signal?: AbortSignal, download=false) {
+  const response = await fetch(`${favoriteCharacterAdminApi}/image/${encodeURIComponent(id)}${download?'?download=1':''}`, {
     credentials: 'same-origin', cache: 'no-store', headers: administratorHeaders(), signal,
   });
   if (!response.ok) throw new Error(response.status === 401 ? '登录已过期，请重新登录。' : '图片暂时无法读取，请重试。');
@@ -64,10 +64,11 @@ function ImagePreview({ id, filename, size }: { id: string; filename: string; si
       {/* Browser-local object URLs preserve the authenticated image read. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt={`投稿图片 ${filename}`} onError={() => { setUrl(''); setError('这张图片无法预览，请核对原图。'); }} />
-    </a><a className="text-link" href={url} download={filename}>下载 {filename}</a></>
+    </a><a className="text-link" href={url} download={filename} onClick={async event=>{event.preventDefault();try{saveBlob(await (await imageResponse(id,undefined,true)).blob(),filename)}catch(reason){setError((reason as Error).message)}}}>下载 {filename}</a></>
       : error ? <><p className="field-hint" role="alert">{error}</p><button className="btn secondary" type="button" onClick={() => setRetry(n => n + 1)}>重试预览</button></>
         : large && !visible ? <button className="btn secondary" type="button" onClick={() => setVisible(true)}>加载原图预览（{(size / 1024 / 1024).toFixed(1)} MB）</button>
           : <p className="field-hint">{visible ? '正在读取图片…' : '图片预览'}</p>}
+    {url&&error&&<p className="field-hint" role="alert">{error}</p>}
   </div>;
 }
 
@@ -136,9 +137,10 @@ export function FavoriteCharacterSurveyAdmin() {
         const handle = await pickSave.call(window, { suggestedName: filename, types: [{ description: 'ZIP 压缩包', accept: { 'application/zip': ['.zip'] } }] });
         sink = await handle.createWritable();
       }
+      await api(favoriteCharacterAdminApi+'?export=zip');
       const { favoriteCharacterExportPlan, writeFavoriteCharacterZip } = await import('@/lib/favorite-character-export');
       const chunks: Uint8Array<ArrayBuffer>[] = [];
-      await writeFavoriteCharacterZip(favoriteCharacterExportPlan(rows, mode), mode, imageResponse, async bytes => {
+      await writeFavoriteCharacterZip(favoriteCharacterExportPlan(rows, mode), mode, id=>imageResponse(id,undefined,true), async bytes => {
         if (sink) await sink.write(bytes); else chunks.push(bytes);
       }, count => setResultsStatus(`正在打包图片（${count}/${rows.length}）…`));
       if (sink) await sink.close();
@@ -155,6 +157,7 @@ export function FavoriteCharacterSurveyAdmin() {
     if (exporting || !indexed.length) return;
     setExporting('csv'); setResultsError(''); setResultsStatus('');
     try {
+      await api(favoriteCharacterAdminApi+'?export=client_csv');
       const { favoriteCharacterArchiveCsv, favoriteCharacterExportPlan } = await import('@/lib/favorite-character-export');
       const csv = favoriteCharacterArchiveCsv(favoriteCharacterExportPlan(indexed, 'archive'));
       saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '艺68角色图片_提交清单.csv');

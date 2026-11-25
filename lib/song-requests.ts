@@ -1,3 +1,4 @@
+import {emitEvent} from './site-telemetry';
 import { z } from 'zod';
 import { database } from './data';
 import { HttpError } from './http';
@@ -11,10 +12,11 @@ export const songInput = z.object({
 export const songDeleteInput = z.object({ id: z.number().int().positive() }).strict();
 export async function saveSongRequest(answer: z.infer<typeof songInput>) {
   const db = database();
-  await db.prepare('INSERT INTO song_requests(request_id,song,submitted_at) VALUES (?,?,?) ON CONFLICT(request_id) DO NOTHING')
+  const inserted=await db.prepare('INSERT INTO song_requests(request_id,song,submitted_at) VALUES (?,?,?) ON CONFLICT(request_id) DO NOTHING')
     .bind(answer.request_id, answer.song, new Date().toISOString()).run();
   const saved = await db.prepare('SELECT song FROM song_requests WHERE request_id=?').bind(answer.request_id).first<{song:string}>();
   if (!saved || saved.song !== answer.song) throw new HttpError(409, '这次点歌已经提交，请点击“重新点歌”再提交下一首。');
+  if(inserted.meta.changes)void emitEvent({id:'song:'+answer.request_id,event_name:'form_submit_success',module_id:'songs'});
 }
 export async function songRequests() {
   return (await database().prepare('SELECT id,song,submitted_at FROM song_requests ORDER BY id ASC').all<SongRequest>()).results;

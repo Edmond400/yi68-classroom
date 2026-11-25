@@ -1,3 +1,4 @@
+import {emitEvent} from './site-telemetry';
 import { database } from './data';
 import { HttpError } from './http';
 import { brandSummary, canonicalName, defaultDrinkSettings, drinkSetting, drinkSettingsInput, normalizeOrder, purchaseSummary, type DrinkRow, type DrinkSettings } from './drink-order-model';
@@ -33,6 +34,7 @@ export async function saveDrinkOrder(name: string, raw: unknown, admin = false) 
     ON CONFLICT(student_id) DO UPDATE SET order_json=excluded.order_json,updated_at=excluded.updated_at`)
     .bind(member.student_id, JSON.stringify(order), now, now, Number(admin), drinkSetting, drinkSetting, member.student_id).run();
   if (!result.meta.changes) throw new HttpError(409, '问卷已截止或关闭，请联系班长修改。');
+  if(!admin)void emitEvent({event_name:'form_submit_success',module_id:'drinks'});
   return (await readDrinkOrder(member.student_id))!;
 }
 export async function drinkAdminData() {

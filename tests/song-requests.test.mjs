@@ -19,7 +19,7 @@ try {
   const post = (id, song, headers = { Origin: origin }) => app.studentPost(new Request(origin + app.songPath, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers }, body: new URLSearchParams({ request_id: id, song }) }));
   const page = () => app.studentGet(new Request(origin + app.songPath));
   const html = await (await page()).text(), html2 = await (await page()).text();
-  assert.equal((html.match(/type="text"/g) || []).length, 1); assert(!html.includes('<script')); assert.match(html, /name="song" required/);
+  assert.equal((html.match(/type="text"/g) || []).length, 1); assert(!html.replace('<script defer src="/telemetry.js"></script>','').includes('<script')); assert.match(html, /name="song" required/);
   const getId = h => /name="request_id" value="([^"]+)"/.exec(h)[1]; assert.notEqual(getId(html), getId(html2));
   const id = getId(html);
   const retried = await Promise.all([post(id, ' 合成歌曲甲 '), post(id, '合成歌曲甲'), post(id, '合成歌曲甲')]);
